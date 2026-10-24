@@ -5,6 +5,7 @@ import { Badge } from "./components/ui/badge"
 import { Separator } from "./components/ui/separator"
 import { Button } from "./components/ui/button"
 import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X } from "lucide-react"
+import ArchitectureDiagram from "./components/ArchitectureDiagram"
 import CopyButton from "./components/CopyButton"
 
 const navItems = [
