@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/components.json",
+  "style": "new",
+  "rsc": false,
+  "tsx": true,
+  "css": true,
+  "aliases": {
+    "ui": "@/components/ui"
+  },
+  "iconLibrary": "lucide",
+  "components": {
+    "button": {
+      "variantPrefix": "btn"
+    },
+    "input": {
+      "variantPrefix": "inp"
+    }
+  }
+}

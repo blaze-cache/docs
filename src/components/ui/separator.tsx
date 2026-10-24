@@ -1,0 +1,9 @@
+import * as React from "react"
+import { cn } from "../../lib/utils"
+
+const Separator = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} role="separator" aria-orientation="horizontal" className={cn("h-[1px] w-full bg-border shrink-0", className)} {...props} />
+))
+Separator.displayName = "Separator"
+
+export { Separator }
