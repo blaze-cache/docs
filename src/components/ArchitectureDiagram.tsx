@@ -1,4 +1,4 @@
-import { Layers, Database, Clock, Tag, ArrowDown, Globe, Cpu, HardDrive, Link2, Box } from "lucide-react"
+import { Layers, Database, Clock, Tag, ArrowDown, Globe, Link2, Box } from "lucide-react"
 
 export default function ArchitectureDiagram() {
   return (

@@ -339,17 +339,7 @@ cache.invalidateTags('user:42');" />
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#8a1e2e]/20 text-[#8a1e2e] shadow-lg shadow-[#8a1e2e]/10"><Flame size={20} /></div>
                 <h3 className="text-3xl font-extrabold tracking-tight">Architecture</h3>
               </div>
-              <Card className="border-[#2a1818] bg-[#121012]/60">
-                <CardContent className="pt-6 space-y-3 text-sm text-muted-foreground leading-7">
-                  <p><strong className="text-foreground">No threads, no async runtime, no I/O</strong> in the Rust core (<code>blaze-cache-core</code>).</p>
-                  <p><strong className="text-foreground">Slab allocator</strong>: Entries live in <code>Vec&lt;Option&lt;Node&gt;&gt;</code> with a free list — nodes never move, eviction is O(1).</p>
-                  <p><strong className="text-foreground">SIEVE queue</strong>: Doubly linked list ordered oldest → newest with a persistent <code>hand</code> cursor.</p>
-                  <p><strong className="text-foreground">TTL fast-path</strong>: <code>ttl_count</code> tracks entries with deadlines. When zero, reads skip <code>Instant::now()</code> entirely.</p>
-                  <p><strong className="text-foreground">Tags</strong>: Monotonic tag IDs; invalidation is set difference rather than scan.</p>
-                  <p><strong className="text-foreground">Persistence</strong>: IndexedDB adapter with debounced writes and <code>pagehide</code> / <code>visibilitychange</code> flushes.</p>
-                  <p><strong className="text-foreground">ESM only</strong>: Browser-only target; no Node/SSR.</p>
-                </CardContent>
-              </Card>
+              <ArchitectureDiagram />
             </section>
 
             <Separator className="my-16 bg-[#2a1818]" />
