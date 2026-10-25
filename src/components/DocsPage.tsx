@@ -513,7 +513,7 @@ cache.invalidateTags('fetch');`} />
                     {[
                       { name: "ttlMs", sig: "number | (response, url, init) => number", desc: "Freshness window in ms. Default 60_000; a response Cache-Control: max-age overrides it, minus its Age." },
                       { name: "methods", sig: "string[]", desc: "Methods eligible for caching. Default ['GET'] — pass ['GET', 'HEAD'] to include HEAD. Anything else always hits the network." },
-                      { name: "cacheControl", sig: "boolean", desc: "Honour Cache-Control on both sides: no-store / no-cache skip the read, max-age sets the TTL, no-store responses are never stored. Default true." },
+                      { name: "cacheControl", sig: "boolean", desc: "Honour Cache-Control on both sides: no-store / no-cache skip the read, max-age sets the TTL, no-store responses are never stored. Default true. If a server responds with no-cache (e.g. catfact.ninja/breeds), the entry is never written — set false and rely on ttlMs if you need to cache it anyway." },
                       { name: "staleWhileRevalidate", sig: "boolean | number", desc: "Serve responses past freshness while a background refresh runs — those are marked STALE. Default false." },
                       { name: "key", sig: "(url, init) => string", desc: "Builds the cache key. Default is '<method> <url>' plus a hash of varyHeaders; replace it wholesale if you override it." },
                       { name: "shouldCache", sig: "(response, url, init) => boolean", desc: "Decides what gets stored. Default: 2xx only. Rejected responses still return — just marked MISS." },
