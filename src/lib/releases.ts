@@ -116,6 +116,7 @@ const CORE_METHODS: MethodInfo[] = [
   { name: "tagsOf", sig: "(key: string) => string[]", desc: "Tags attached to key (empty when unknown)." },
   { name: "hasTag", sig: "(key: string, tag: string) => boolean", desc: "True when key carries tag." },
   { name: "stats", sig: "() => CacheStats", desc: "Cumulative counters plus computed hitRate." },
+  { name: "resetStats", sig: "() => void", desc: "Zeroes the cumulative counters without touching stored entries." },
   { name: "clear", sig: "() => void", desc: "Empties the cache entirely." },
   { name: "prune", sig: "() => string[]", desc: "Removes every expired entry, returning removed keys." },
   { name: "invalidateTags", sig: "(...tags: string[]) => string[]", desc: "Removes every entry carrying any of tags, returning removed keys." },
@@ -154,6 +155,30 @@ const CORE_METHODS_BETA: MethodInfo[] = [
     name: "ttl",
     sig: "(key: string) => number | undefined",
     desc: "Milliseconds until it expires, or undefined both for 'no deadline' and for 'missing or expired'.",
+    isNew: true,
+  },
+  {
+    name: "getMany",
+    sig: "(keys: string[]) => (V | undefined)[]",
+    desc: "One lookup per key in a single wasm crossing, with the same accounting as get(): a value (or undefined) per key in request order, hits and misses counted, events emitted.",
+    isNew: true,
+  },
+  {
+    name: "setMany",
+    sig: "(entries: SetManyEntry<V>[]) => void",
+    desc: "Stores every { key, value, options } in one crossing — a batched set(). Each entry refreshes its TTL and replaces its tags exactly as set() does.",
+    isNew: true,
+  },
+  {
+    name: "hasMany",
+    sig: "(keys: string[]) => boolean[]",
+    desc: "One presence flag per requested key. Like has(), it never mutates eviction state and records nothing.",
+    isNew: true,
+  },
+  {
+    name: "deleteMany",
+    sig: "(keys: string[]) => boolean[]",
+    desc: "Removes every listed key, answering true per key that was actually present.",
     isNew: true,
   },
   {
