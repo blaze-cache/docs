@@ -93,6 +93,7 @@ const NAV_BETA: NavItem[] = [
   { id: "whatsnew", label: "What's New" },
   { id: "install", label: "Installation" },
   { id: "core", label: "Core API" },
+  { id: "events", label: "Events" },
   { id: "axios", label: "Axios Adapter" },
   { id: "fetch", label: "Fetch Adapter" },
   { id: "rq", label: "React Query" },
@@ -155,14 +156,32 @@ const CORE_METHODS_BETA: MethodInfo[] = [
     desc: "Milliseconds until it expires, or undefined both for 'no deadline' and for 'missing or expired'.",
     isNew: true,
   },
+  {
+    name: "once",
+    sig: "(type, listener) | (listener) => () => void",
+    desc: "Exactly like on(), but the listener removes itself the moment it fires — first clear, first evict, first anything. Returns its own unsubscribe too.",
+    isNew: true,
+  },
+  {
+    name: "off",
+    sig: "(type?) | (listener?) => void",
+    desc: "Removes listeners in bulk: a type drops every listener for that event, a function drops that listener everywhere, no argument drops everything — and dispose() does that for you on teardown.",
+    isNew: true,
+  },
 ];
 
 /**
- * Corrections to the shared table that only hold from 0.2.1-beta on — the stable route
- * documents 0.1.1, whose behaviour these entries deliberately no longer describe. Merged by
- * name at release construction, so the two tables cannot drift apart on method order.
+ * Corrections to the shared table that only hold from 0.2.1-beta on — the `on()` entry was
+ * revised again for 0.2.3-beta — while the stable route documents 0.1.1, whose behaviour
+ * these entries deliberately no longer describe. Merged by name at release construction,
+ * so the two tables cannot drift apart on method order.
  */
 const CORE_METHODS_FIXES: MethodInfo[] = [
+  {
+    name: "on",
+    sig: "(type, listener) | (listener) | (listener: CacheListener) => () => void",
+    desc: "Subscribes to mutations. A typed per-event listener, a wildcard listener over all ten event types and the legacy CacheListener all fit the same call, and every form returns its own unsubscribe — see Events below.",
+  },
   {
     name: "flush",
     sig: "() => Promise<void>",
@@ -190,12 +209,63 @@ const withFixes = (base: MethodInfo[], overrides: MethodInfo[]): MethodInfo[] =>
   base.map((m) => overrides.find((o) => o.name === m.name) ?? m);
 
 /**
- * What's new on the beta route, newest first: everything 0.2.1-beta changed, followed by the
- * 0.2.0-beta highlights that are still absent from stable. Every claim here mirrors a shipped
- * commit, and every card carries the SHAs of the commits behind it — `git show <sha>` in the
- * main repo takes you straight to the diff that made the claim true.
+ * What's new on the beta route, newest first: everything 0.2.3-beta changed, then the
+ * 0.2.1-beta fixes, then the 0.2.0-beta highlights still absent from stable. Every claim
+ * here mirrors a shipped commit, and every card carries the SHAs of the commits behind it
+ * — `git show <sha>` in the main repo takes you straight to the diff that made the claim
+ * true.
  */
 const WHATS_NEW_BETA: WhatsNewItem[] = [
+  {
+    kind: "new",
+    title: "A typed event system for everything the cache does",
+    desc: "`cache.on('evict', ({ key, value }) => …)` subscribes to one event with a payload typed to exactly that event; `cache.on(listener)` is a wildcard over all ten — `hit`, `miss`, `set`, `delete`, `clear`, `invalidate`, `prune`, `touch`, `evict`, `expire`. `once`, `off` and an unsubscribe handle from every call complete the API, and the legacy `CacheListener` form still works.",
+    href: "#events",
+    more: "Events",
+    commits: [
+      "4a97df6afb808d3e7a65fb21c9e98768673edf0e",
+      "89159b69f5bc66814d1dcab4b1f1267c0eb345d3",
+    ],
+  },
+  {
+    kind: "new",
+    title: "`evict` and `expire` come from the Rust core itself",
+    desc: "Capacity evictions and TTL expirations are recorded by an opt-in drop log inside the wasm core and drained after every `get`, `getMany`, `set` and `setMany`, so they are observable for the first time — and with no listener installed the hot path pays a single predictable branch, never a boundary crossing.",
+    href: "#events",
+    more: "Events",
+    commits: ["89159b69f5bc66814d1dcab4b1f1267c0eb345d3"],
+  },
+  {
+    kind: "new",
+    title: "Batched reads and writes",
+    desc: "`getMany(keys)`, `setMany(entries)`, `hasMany(keys)` and `deleteMany(keys)` move a whole batch across the wasm boundary in one call: a result per key in request order, the same hit/miss and mutation accounting as the singles — and the same events.",
+    href: "#core",
+    more: "Core API",
+    commits: [
+      "166c771d80ed19087e2537880cf004215a9f38ed",
+      "4a97df6afb808d3e7a65fb21c9e98768673edf0e",
+    ],
+  },
+  {
+    kind: "fixed",
+    title: "`touch()` renews a deadline even on a deadline-less cache",
+    desc: "The first renewal into a cache where no entry carried a deadline used to store \"no deadline\" instead — silently making that entry immortal. The clock is now taken on demand, and a regression test pins both the fresh-cache renewal and the `ttlMs: 0` drop-the-deadline semantics.",
+    href: "#core",
+    more: "Core API",
+    commits: ["403401c5f4b4d60e423522c0c9963f4d49a85c4d"],
+  },
+  {
+    kind: "testing",
+    title: "Twenty-three new regression tests",
+    desc: "The event system ships with 18 new core-suite tests — typed payloads, wildcard delivery, listener ordering, and events across store-backed round trips — plus a Rust regression test for `touch()` and four new wasm-binding tests: 42 Rust unit tests plus 3 doctests, 16 wasm tests and 137 offline TypeScript tests, all green without a network.",
+    href: "#repo",
+    more: "Repo & Development",
+    commits: [
+      "27d73804f43dd30f689a3ed1493c982a48ece336",
+      "89159b69f5bc66814d1dcab4b1f1267c0eb345d3",
+      "403401c5f4b4d60e423522c0c9963f4d49a85c4d",
+    ],
+  },
   {
     kind: "fixed",
     title: "`Vary` is checked before anything is stored",
@@ -396,10 +466,10 @@ export const RELEASES: Record<ReleaseId, Release> = {
   },
   beta: {
     id: "beta",
-    version: "0.2.1-beta",
-    badge: "v0.2.1-beta",
+    version: "0.2.3-beta",
+    badge: "v0.2.3-beta",
     isBeta: true,
-    installTag: "@0.2.1-beta",
+    installTag: "@0.2.3-beta",
     packages: [
       { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
       { pkg: "@blaze-cache/fetch", note: "Drop-in fetch() with HTTP caching", peers: "None" },
@@ -408,12 +478,12 @@ export const RELEASES: Record<ReleaseId, Release> = {
     ],
     quickStart: [
       "# core is the only package you must install",
-      "npm install @blaze-cache/core@0.2.1-beta",
+      "npm install @blaze-cache/core@0.2.3-beta",
       "",
       "# then only the integrations you use",
-      "npm install @blaze-cache/fetch@0.2.1-beta",
-      "npm install @blaze-cache/axios@0.2.1-beta",
-      "npm install @blaze-cache/react-query@0.2.1-beta",
+      "npm install @blaze-cache/fetch@0.2.3-beta",
+      "npm install @blaze-cache/axios@0.2.3-beta",
+      "npm install @blaze-cache/react-query@0.2.3-beta",
       "",
       "# peers — only for the adapters above",
       "npm install axios",

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Badge } from "./ui/badge"
 import { Separator } from "./ui/separator"
 import { Button } from "./ui/button"
-import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles } from "lucide-react"
+import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio } from "lucide-react"
 import ArchitectureDiagram from "./ArchitectureDiagram"
 import CopyButton from "./CopyButton"
 import { RELEASES, type ReleaseId } from "../lib/releases"
@@ -173,7 +173,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
             ) : (
               <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#2a1818] bg-[#121012] px-5 py-4 text-sm text-muted-foreground">
                 <Badge variant="outline">preview</Badge>
-                <span>{RELEASES.beta.badge} adds the <code className="font-mono text-foreground">@blaze-cache/fetch</code> adapter, five introspection reads, and a hardening pass over <code className="font-mono text-foreground">Vary</code>, request coalescing and durable writes.</span>
+                <span>{RELEASES.beta.badge} adds the <code className="font-mono text-foreground">@blaze-cache/fetch</code> adapter, a typed event system, five introspection reads, and a hardening pass over <code className="font-mono text-foreground">Vary</code>, request coalescing and durable writes.</span>
                 <Link to="/beta" className="font-medium text-[#f2f0eb] underline underline-offset-4 hover:text-white">Open the beta docs →</Link>
               </div>
             )}
@@ -350,6 +350,105 @@ const cache = await createCache({
             </section>
 
             <Separator className="my-16 bg-[#2a1818]" />
+
+            {/* Events (beta only) */}
+            {isBeta && (
+              <>
+                <section id="events" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#8a1e2e]/20 text-[#8a1e2e] shadow-lg shadow-[#8a1e2e]/10"><Radio size={20} /></div>
+                    <h3 className="text-3xl font-extrabold tracking-tight">Events</h3>
+                  </div>
+                  <p className="mb-6 max-w-3xl text-muted-foreground">
+                    Everything the cache does is observable through a typed event system.
+                    <code className="text-amber-200"> on(type, listener)</code> subscribes to one
+                    event type — the payload typed to exactly that event —{" "}
+                    <code className="text-amber-200">on(listener)</code> subscribes to{" "}
+                    <strong className="text-foreground">all</strong> of them (wildcard), both
+                    return their own unsubscribe function, and <code>once</code> /{" "}
+                    <code>off</code> complete the API.
+                  </p>
+                  <Card className="border-[#2a1818] bg-[#121012] overflow-hidden">
+                    <CardHeader className="border-b border-[#2a1818]">
+                      <code className="font-mono text-sm text-amber-200">typed per event — or one listener for every event</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-[#0a0a0b] p-4 text-sm font-mono leading-7 border border-[#2a1818] text-[#e8cfc8]"><code>{`// One event type — the payload is typed to exactly that event.
+const offEvict = cache.on('evict', ({ key, value }) => {
+  console.log('the cache dropped', key, value);
+});
+
+// Wildcard: every event, payload the full union (narrow on event.type).
+cache.on((event) => {
+  if (event.type === 'hit') console.log('hit', event.key, event.value);
+});
+
+cache.once('clear', () => console.log('first clear, only once'));
+
+cache.off('evict');   // every evict listener
+cache.off();          // every listener, period
+offEvict();           // …or just this one handle (idempotent)`}</code></pre><CopyButton text={`// One event type — the payload is typed to exactly that event.
+const offEvict = cache.on('evict', ({ key, value }) => {
+  console.log('the cache dropped', key, value);
+});
+
+// Wildcard: every event, payload the full union (narrow on event.type).
+cache.on((event) => {
+  if (event.type === 'hit') console.log('hit', event.key, event.value);
+});
+
+cache.once('clear', () => console.log('first clear, only once'));
+
+cache.off('evict');   // every evict listener
+cache.off();          // every listener, period
+offEvict();           // …or just this one handle (idempotent)`} />
+                    </CardContent>
+                  </Card>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[
+                      { name: "hit", when: "`get()` / `getMany()` found a live entry", payload: "key, value", core: false },
+                      { name: "miss", when: "a lookup found nothing — absent or expired", payload: "key", core: false },
+                      { name: "set", when: "a key was stored (insert or replace)", payload: "key", core: false },
+                      { name: "delete", when: "a key was removed and was present", payload: "key", core: false },
+                      { name: "clear", when: "the cache was emptied", payload: "—", core: false },
+                      { name: "invalidate", when: "`invalidateTags()` removed entries", payload: "keys", core: false },
+                      { name: "prune", when: "`prune()` removed expired entries", payload: "keys", core: false },
+                      { name: "touch", when: "`touch()` renewed a live entry's deadline", payload: "key", core: false },
+                      { name: "evict", when: "the core dropped an entry to stay within capacity", payload: "key, value", core: true },
+                      { name: "expire", when: "the core reclaimed an entry whose TTL elapsed", payload: "key, value", core: true },
+                    ].map((e) => (
+                      <div key={e.name} className="text-left rounded-xl border border-[#2a1818] bg-[#121012] px-4 py-3 shadow-sm hover:border-[#8a1e2e] transition-colors group">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-sm font-semibold text-[#f2f0eb] group-hover:text-[#fff5f0]">'{e.name}'</span>
+                          {e.core && <Badge variant="outline" className="border-amber-600/60 px-1.5 py-0 text-[10px] text-amber-300">rust core</Badge>}
+                        </div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed"><RichText text={e.when} /></div>
+                        <div className="mt-2 font-mono text-[11px] text-muted-foreground">payload: {e.payload}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Eight of those are raised in TypeScript around the call you made.{" "}
+                    <code>evict</code> and <code>expire</code> happen{" "}
+                    <em className="text-foreground not-italic font-medium">inside the Rust core</em>{" "}
+                    and are delivered from an opt-in drop log: the first listener interested in
+                    them switches it on through the wasm binding, and with no such listener the hot
+                    path pays a single predictable branch — never a boundary crossing. Drains run
+                    after <code>get</code>, <code>getMany</code>, <code>set</code> and{" "}
+                    <code>setMany</code>, so an <code>evict</code> or <code>expire</code> lands right
+                    after the operation that caused it. Listeners run
+                    synchronously in registration order, a throwing listener is logged and skipped —
+                    never able to undo a mutation — and reads that record nothing (<code>peek</code>,{" "}
+                    <code>has</code>, <code>ttl</code>, <code>size</code>) emit nothing.{" "}
+                    <code>dispose()</code> clears every listener along with the wasm memory.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-[#2a1818]" />
+              </>
+            )}
 
             {/* Axios */}
             <section id="axios" className="mb-20 scroll-mt-28">
@@ -646,13 +745,18 @@ cache.invalidateTags('user:42');" />
                   </CardContent>
                 </Card>
                 <Card className="border-[#2a1818] bg-[#121012]">
-                  <CardHeader><CardTitle>Event Listeners</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle>Event Listeners</CardTitle>
+                    {isBeta && <CardDescription>Typed per event — or one wildcard listener for all ten.</CardDescription>}
+                  </CardHeader>
                   <CardContent className="relative">
-                    <pre className="overflow-x-auto rounded-lg bg-[#0a0a0b] p-4 text-sm font-mono leading-7 border border-[#2a1818] text-[#e8cfc8]"><code>{`const unsubscribe = cache.on((change) => {
+                    <pre className="overflow-x-auto rounded-lg bg-[#0a0a0b] p-4 text-sm font-mono leading-7 border border-[#2a1818] text-[#e8cfc8]"><code>{isBeta ? `cache.on('evict', ({ key, value }) => console.log('dropped', key, value));
+cache.on((event) => console.log(event.type));   // wildcard — every event` : `const unsubscribe = cache.on((change) => {
   if (change.type === 'set') console.log('set:', change.key);
-});`}</code></pre><CopyButton text="const unsubscribe = cache.on((change) => {
+});`}</code></pre><CopyButton text={isBeta ? `cache.on('evict', ({ key, value }) => console.log('dropped', key, value));
+cache.on((event) => console.log(event.type));   // wildcard — every event` : `const unsubscribe = cache.on((change) => {
   if (change.type === 'set') console.log('set:', change.key);
-});" />
+});`} />
                   </CardContent>
                 </Card>
                 {isBeta && (
