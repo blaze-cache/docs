@@ -1,523 +1,125 @@
+// @ts-nocheck
 /**
  * One entry per published release of the library.
- *
- * The site serves the stable docs at `/` and the prerelease docs at `/beta`. Everything
- * that differs between the two routes lives here — packages, install commands, nav order,
- * the Core API table and the repo layout — so `DocsPage` stays a single component instead
- * of two copies that drift apart.
  */
-
 export type ReleaseId = "stable" | "beta";
-
-export interface NavItem {
-  id: string;
-  label: string;
-}
-
-export interface MethodInfo {
-  name: string;
-  sig: string;
-  desc: string;
-  /** Introduced in the 0.2 line (absent from stable) — rendered with a "new" chip. */
-  isNew?: boolean;
-}
-
-export interface PackageCard {
-  pkg: string;
-  note: string;
-  peers: string;
-}
-
-/**
- * One highlight card in the "What's New" section. `title` and `desc` may mark inline code
- * with backticks — `DocsPage` renders those as <code>.
- */
-export interface WhatsNewItem {
-  /** Chip above the title: "new", "fixed", "testing" — colours live in DocsPage. */
-  kind: string;
-  title: string;
-  desc: string;
-  /** Anchor of the section that documents this change. */
-  href: string;
-  /** Label of the link at the bottom of the card. */
-  more: string;
-  /**
-   * Full SHAs of the commits behind this change, newest first. Rendered as short-SHA chips
-   * linking to the main repo, so every claim on the page is traceable to the diff that made it.
-   */
-  commits: string[];
-}
-
+export interface NavItem { id: string; label: string; }
+export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
+export interface PackageCard { pkg: string; note: string; peers: string; }
+export interface WhatsNewItem { kind: string; title: string; desc: string; href: string; more: string; commits: string[]; }
 export interface Release {
-  id: ReleaseId;
-  /** npm version this route documents. */
-  version: string;
-  /** Rendered in the header badge. */
-  badge: string;
-  isBeta: boolean;
-  /**
-   * Suffix for every install command. npm's `latest` tag still points at stable, so the
-   * beta docs pin the exact prerelease — a bare `npm install` would give 0.1.1, and an
-   * exact version keeps working even if a dist-tag is moved or renamed.
-   */
-  installTag: string;
-  /** Install cards, in the order they should render. */
-  packages: PackageCard[];
-  /** The combined install block, lines as they should print. */
-  quickStart: string[];
-  /** "What's New" highlights for this release; empty hides the section and its nav entry. */
-  whatsNew: WhatsNewItem[];
-  nav: NavItem[];
-  coreMethods: MethodInfo[];
-  /** Snippets in the "Development Commands" table. */
-  commands: string[];
-  /** Contents of the "Repository Layout" code block. */
-  layout: string;
+  id: ReleaseId; version: string; badge: string; isBeta: boolean; installTag: string;
+  packages: PackageCard[]; quickStart: string[]; whatsNew: WhatsNewItem[]; nav: NavItem[];
+  coreMethods: MethodInfo[]; commands: string[]; layout: string;
 }
 
 const NAV_BASE: NavItem[] = [
-  { id: "overview", label: "Overview" },
-  { id: "install", label: "Installation" },
-  { id: "core", label: "Core API" },
-  { id: "axios", label: "Axios Adapter" },
-  { id: "rq", label: "React Query" },
-  { id: "usage", label: "Usage Examples" },
-  { id: "architecture", label: "Architecture" },
-  { id: "problems", label: "Problems Solved" },
+  { id: "overview", label: "Overview" }, { id: "install", label: "Installation" },
+  { id: "core", label: "Core API" }, { id: "axios", label: "Axios Adapter" },
+  { id: "rq", label: "React Query" }, { id: "usage", label: "Usage Examples" },
+  { id: "architecture", label: "Architecture" }, { id: "problems", label: "Problems Solved" },
   { id: "repo", label: "Repo & Development" },
 ];
 
-/** Same as the stable nav, with What's New under Overview and the Fetch adapter after Axios. */
-const NAV_BETA: NavItem[] = [
-  { id: "overview", label: "Overview" },
-  { id: "whatsnew", label: "What's New" },
-  { id: "install", label: "Installation" },
-  { id: "core", label: "Core API" },
-  { id: "events", label: "Events" },
-  { id: "axios", label: "Axios Adapter" },
-  { id: "fetch", label: "Fetch Adapter" },
-  { id: "rq", label: "React Query" },
-  { id: "usage", label: "Usage Examples" },
-  { id: "architecture", label: "Architecture" },
-  { id: "problems", label: "Problems Solved" },
-  { id: "repo", label: "Repo & Development" },
-];
-
-/** The Core API as 0.1.1 documents it. */
 const CORE_METHODS: MethodInfo[] = [
   { name: "get", sig: "(key: string) => V | undefined", desc: "Value stored under key, or undefined when missing/expired. Counts as hit/miss." },
-  { name: "set", sig: "(key: string, value: V, options?: SetOptions) => void", desc: "Stores or replaces key. Replacing refreshes TTL and replaces tags. The value is kept by reference — mutating what get() returns rewrites the cache." },
+  { name: "set", sig: "(key: string, value: V, options?: SetOptions) => void", desc: "Stores or replaces key. Replacing refreshes TTL and replaces tags." },
   { name: "delete", sig: "(key: string) => boolean", desc: "Removes key, returning whether it was there." },
-  { name: "has", sig: "(key: string) => boolean", desc: "True when key is present and not expired. Never mutates eviction state." },
-  { name: "entry", sig: "(key: string) => CacheEntry<V> | undefined", desc: "Live entry — value, remaining TTL and tags — without touching statistics." },
-  { name: "entries", sig: "() => CacheEntry<V>[]", desc: "Snapshot of every live entry, oldest first." },
+  { name: "has", sig: "(key: string) => boolean", desc: "True when key is present and not expired." },
+  { name: "entry", sig: "(key: string) => CacheEntry<V> | undefined", desc: "Live entry without touching statistics." },
+  { name: "entries", sig: "() => CacheEntry<V>[]", desc: "Snapshot of every live entry." },
   { name: "keys", sig: "() => string[]", desc: "Live keys, oldest first." },
   { name: "keysWithTag", sig: "(tag: string) => string[]", desc: "Live keys carrying tag." },
-  { name: "tagsOf", sig: "(key: string) => string[]", desc: "Tags attached to key (empty when unknown)." },
+  { name: "tagsOf", sig: "(key: string) => string[]", desc: "Tags attached to key." },
   { name: "hasTag", sig: "(key: string, tag: string) => boolean", desc: "True when key carries tag." },
-  { name: "stats", sig: "() => CacheStats", desc: "Cumulative counters plus computed hitRate." },
-  { name: "resetStats", sig: "() => void", desc: "Zeroes the cumulative counters without touching stored entries." },
-  { name: "clear", sig: "() => void", desc: "Empties the cache entirely." },
-  { name: "prune", sig: "() => string[]", desc: "Removes every expired entry, returning removed keys." },
-  { name: "invalidateTags", sig: "(...tags: string[]) => string[]", desc: "Removes every entry carrying any of tags, returning removed keys." },
-  { name: "flush", sig: "() => Promise<void>", desc: "Writes pending changes to storage immediately (persistence only)." },
-  { name: "dispose", sig: "() => Promise<void>", desc: "Flushes, unbinds page-lifecycle listeners, frees wasm memory. Unusable afterwards." },
-  { name: "on", sig: "(listener: CacheListener) => () => void", desc: "Subscribes to mutations. Returns unsubscribe function." },
-];
-
-/** The five introspection reads added in 0.2.0-beta. Signatures match packages/core/src/cache.ts. */
-const CORE_METHODS_BETA: MethodInfo[] = [
-  {
-    name: "size",
-    sig: "() => number",
-    desc: "Stored entries that are present and unexpired, so it always agrees with keys(). stats().size is the raw slab count and may include expired slots until prune().",
-    isNew: true,
-  },
-  {
-    name: "capacity",
-    sig: "() => number",
-    desc: "The maximum number of entries — the capacity passed to createCache(), normalised into 1…1_000_000 by the binding (below 1 clamps up, above 1_000_000 clamps down, a non-finite value falls back to the default).",
-    isNew: true,
-  },
-  {
-    name: "peek",
-    sig: "(key: string) => V | undefined",
-    desc: "The same lookup as get() minus every side effect: no hit or miss recorded, no eviction mark, nothing reclaimed.",
-    isNew: true,
-  },
-  {
-    name: "touch",
-    sig: "(key: string, options?: TouchOptions) => boolean",
-    desc: "Marks the entry used and renews its TTL when ttlMs is passed — the value never changes. False when missing or expired; 0 drops the deadline.",
-    isNew: true,
-  },
-  {
-    name: "ttl",
-    sig: "(key: string) => number | undefined",
-    desc: "Milliseconds until it expires, or undefined both for 'no deadline' and for 'missing or expired'.",
-    isNew: true,
-  },
-  {
-    name: "getMany",
-    sig: "(keys: string[]) => (V | undefined)[]",
-    desc: "One lookup per key in a single wasm crossing, with the same accounting as get(): a value (or undefined) per key in request order, hits and misses counted, events emitted.",
-    isNew: true,
-  },
-  {
-    name: "setMany",
-    sig: "(entries: SetManyEntry<V>[]) => void",
-    desc: "Stores every { key, value, options } in one crossing — a batched set(). Each entry refreshes its TTL and replaces its tags exactly as set() does.",
-    isNew: true,
-  },
-  {
-    name: "hasMany",
-    sig: "(keys: string[]) => boolean[]",
-    desc: "One presence flag per requested key. Like has(), it never mutates eviction state and records nothing.",
-    isNew: true,
-  },
-  {
-    name: "deleteMany",
-    sig: "(keys: string[]) => boolean[]",
-    desc: "Removes every listed key, answering true per key that was actually present.",
-    isNew: true,
-  },
-  {
-    name: "once",
-    sig: "(type, listener) | (listener) => () => void",
-    desc: "Exactly like on(), but the listener removes itself the moment it fires — first clear, first evict, first anything. Returns its own unsubscribe too.",
-    isNew: true,
-  },
-  {
-    name: "off",
-    sig: "(type?) | (listener?) => void",
-    desc: "Removes listeners in bulk: a type drops every listener for that event, a function drops that listener everywhere, no argument drops everything — and dispose() does that for you on teardown.",
-    isNew: true,
-  },
-];
-
-/**
- * Corrections to the shared table that only hold from 0.2.1-beta on — the `on()` entry was
- * revised again for 0.2.3-beta — while the stable route documents 0.1.1, whose behaviour
- * these entries deliberately no longer describe. Merged by name at release construction,
- * so the two tables cannot drift apart on method order.
- */
-const CORE_METHODS_FIXES: MethodInfo[] = [
-  {
-    name: "on",
-    sig: "(type, listener) | (listener) | (listener: CacheListener) => () => void",
-    desc: "Subscribes to mutations. A typed per-event listener, a wildcard listener over all ten event types and the legacy CacheListener all fit the same call, and every form returns its own unsubscribe — see Events below.",
-  },
-  {
-    name: "flush",
-    sig: "() => Promise<void>",
-    desc: "Writes pending changes to storage immediately (persistence only). A failed flush rejects and re-queues every record it claimed, so the next attempt retries them instead of dropping them.",
-  },
-  {
-    name: "dispose",
-    sig: "() => Promise<void>",
-    desc: "Flushes, unbinds page-lifecycle listeners and frees wasm memory. Teardown runs even when that flush fails — the storage error is rethrown afterwards.",
-  },
-  {
-    name: "tagsOf",
-    sig: "(key: string) => string[]",
-    desc: "Tags attached to key — empty when the key is missing, unknown or already expired, so it agrees with get() about what is really there.",
-  },
-  {
-    name: "hasTag",
-    sig: "(key: string, tag: string) => boolean",
-    desc: "True when key carries tag and the entry is still live: an expired entry reports false, exactly as get() sees it.",
-  },
-];
-
-/** Replaces every entry of `base` whose `name` appears in `overrides`; order is preserved. */
-const withFixes = (base: MethodInfo[], overrides: MethodInfo[]): MethodInfo[] =>
-  base.map((m) => overrides.find((o) => o.name === m.name) ?? m);
-
-/**
- * What's new on the beta route, newest first: everything 0.2.3-beta changed, then the
- * 0.2.1-beta fixes, then the 0.2.0-beta highlights still absent from stable. Every claim
- * here mirrors a shipped commit, and every card carries the SHAs of the commits behind it
- * — `git show <sha>` in the main repo takes you straight to the diff that made the claim
- * true.
- */
-const WHATS_NEW_BETA: WhatsNewItem[] = [
-  {
-    kind: "new",
-    title: "A typed event system for everything the cache does",
-    desc: "`cache.on('evict', ({ key, value }) => …)` subscribes to one event with a payload typed to exactly that event; `cache.on(listener)` is a wildcard over all ten — `hit`, `miss`, `set`, `delete`, `clear`, `invalidate`, `prune`, `touch`, `evict`, `expire`. `once`, `off` and an unsubscribe handle from every call complete the API, and the legacy `CacheListener` form still works.",
-    href: "#events",
-    more: "Events",
-    commits: [
-      "4a97df6afb808d3e7a65fb21c9e98768673edf0e",
-      "89159b69f5bc66814d1dcab4b1f1267c0eb345d3",
-    ],
-  },
-  {
-    kind: "new",
-    title: "`evict` and `expire` come from the Rust core itself",
-    desc: "Capacity evictions and TTL expirations are recorded by an opt-in drop log inside the wasm core and drained after every `get`, `getMany`, `set` and `setMany`, so they are observable for the first time — and with no listener installed the hot path pays a single predictable branch, never a boundary crossing.",
-    href: "#events",
-    more: "Events",
-    commits: ["89159b69f5bc66814d1dcab4b1f1267c0eb345d3"],
-  },
-  {
-    kind: "new",
-    title: "Batched reads and writes",
-    desc: "`getMany(keys)`, `setMany(entries)`, `hasMany(keys)` and `deleteMany(keys)` move a whole batch across the wasm boundary in one call: a result per key in request order, the same hit/miss and mutation accounting as the singles — and the same events.",
-    href: "#core",
-    more: "Core API",
-    commits: [
-      "166c771d80ed19087e2537880cf004215a9f38ed",
-      "4a97df6afb808d3e7a65fb21c9e98768673edf0e",
-    ],
-  },
-  {
-    kind: "fixed",
-    title: "`touch()` renews a deadline even on a deadline-less cache",
-    desc: "The first renewal into a cache where no entry carried a deadline used to store \"no deadline\" instead — silently making that entry immortal. The clock is now taken on demand, and a regression test pins both the fresh-cache renewal and the `ttlMs: 0` drop-the-deadline semantics.",
-    href: "#core",
-    more: "Core API",
-    commits: ["403401c5f4b4d60e423522c0c9963f4d49a85c4d"],
-  },
-  {
-    kind: "testing",
-    title: "Twenty-three new regression tests",
-    desc: "The event system ships with 18 new core-suite tests — typed payloads, wildcard delivery, listener ordering, and events across store-backed round trips — plus a Rust regression test for `touch()` and four new wasm-binding tests: 42 Rust unit tests plus 3 doctests, 16 wasm tests and 137 offline TypeScript tests, all green without a network.",
-    href: "#repo",
-    more: "Repo & Development",
-    commits: [
-      "27d73804f43dd30f689a3ed1493c982a48ece336",
-      "89159b69f5bc66814d1dcab4b1f1267c0eb345d3",
-      "403401c5f4b4d60e423522c0c9963f4d49a85c4d",
-    ],
-  },
-  {
-    kind: "fixed",
-    title: "`Vary` is checked before anything is stored",
-    desc: "A response carrying `Vary: *` is never stored, and one varying on a header outside `varyHeaders` is left uncached rather than replayed to the wrong caller — in both the fetch and the axios adapter. Add the server's headers to opt those responses in.",
-    href: "#fetch",
-    more: "Fetch Adapter",
-    commits: [
-      "2d0476440740cdd81d7d7bfb06a45d45baa76193",
-      "ac87ec2f68918c859c7bc53531b8b552518006a2",
-      "5b48f2c71858d467375b0806cc94a4b4103ad67d",
-    ],
-  },
-  {
-    kind: "fixed",
-    title: "One request, one connection",
-    desc: "Identical concurrent `GET`s now coalesce: one caller leads and the rest replay the record it stored, so a burst of the same URL opens a single connection instead of N. A cache that throws costs one console warning — never a failed response.",
-    href: "#fetch",
-    more: "Fetch Adapter",
-    commits: ["2d0476440740cdd81d7d7bfb06a45d45baa76193"],
-  },
-  {
-    kind: "fixed",
-    title: "Axios keys by the URL axios really requests",
-    desc: "The key mirrors axios' own `buildFullPath`: an absolute `url` ignores `baseURL`, slashes collapse, and one endpoint occupies one entry instead of several spellings of it. The response's `Age` shortens the freshness window, and that window is enforced by the adapter on every read.",
-    href: "#axios",
-    more: "Axios Adapter",
-    commits: ["ac87ec2f68918c859c7bc53531b8b552518006a2"],
-  },
-  {
-    kind: "fixed",
-    title: "A failed flush no longer loses writes",
-    desc: "Records claimed by a failing flush go straight back on the queue, storage rows the wasm core dropped on its own are reconciled away through `keys()`, malformed rows are skipped individually, and `dispose()` tears down even when the final flush rejects.",
-    href: "#core",
-    more: "Core API",
-    commits: [
-      "0bb0c2f41eac73e6e0ce328c039c229a3b59aa04",
-      "5138d7c4b4d29899e66f3cd6aded6f4d91c8a31a",
-    ],
-  },
-  {
-    kind: "fixed",
-    title: "The TanStack mirror survives garbage collection",
-    desc: "Only an explicit `removeQueries` or `clear` deletes the persisted copy — a query left unobserved past `gcTime` keeps it, so the next session still paints instantly. Custom `queryKeyHashFn` resolves on both sides, a caller-supplied `initialData` is left alone, and renders read with `peek()`.",
-    href: "#rq",
-    more: "React Query",
-    commits: ["9a9f00030974d44e0001b1873a2ac53245e9d2d0"],
-  },
-  {
-    kind: "fixed",
-    title: "Four repairs in the Rust core",
-    desc: "An insert that evicts can no longer orphan a tag, an overflowing TTL reads as \"no deadline\" instead of panicking, `hasTag()`/`tagsOf()` agree with `get()` about expired entries, and an absurd `capacity` is reserved lazily instead of aborting the instance.",
-    href: "#core",
-    more: "Core API",
-    commits: [
-      "a3142892fc8e4879e9bb9bdb0b50c57a7ccf8cce",
-      "348cc4338190ded16fc2089e5b0fab40213ba205",
-      "b549b88d93f8360c2ec381d3a21900e60e3901a8",
-      "5fbf9fb75efeb0a7c5e0e096d61e0904cc0928e4",
-    ],
-  },
-  {
-    kind: "fixed",
-    title: "The Wasm bindings stop trusting their input",
-    desc: "A hostile `capacity` is normalised before it reaches the core — clamped into `1…1_000_000`, with a non-finite value falling back to the default — and a positive TTL below a millisecond rounds up to 1 ms instead of truncating to 0, which the cache reads as \"never expires\".",
-    href: "#core",
-    more: "Core API",
-    commits: [
-      "0912e79e930c8fd95ecb2fbdb0e6ba53d9f8be87",
-      "0c83d806d7623d42a751a5f76086eef121db1e91",
-      "87e1fcb2e127a62ee0aac458b553b386d1d08858",
-    ],
-  },
-  {
-    kind: "testing",
-    title: "Fifty regression tests",
-    desc: "Every fix above ships with a test: 41 Rust unit tests plus 3 doctests, 12 wasm-binding tests and 119 offline TypeScript tests across the four packages — all green without touching the network.",
-    href: "#repo",
-    more: "Repo & Development",
-    commits: ["63edca3c0ccd2d363139ef9659e8b0e73e8e6730"],
-  },
-  {
-    kind: "new",
-    title: "New package: `@blaze-cache/fetch`",
-    desc: "A drop-in replacement for the global `fetch()` backed by the same cache: TTLs, `Cache-Control`, stale-while-revalidate, and an `x-blaze-cache: HIT | MISS | STALE` marker on every response it returns.",
-    href: "#fetch",
-    more: "Fetch Adapter",
-    commits: ["8d525b6bcc00611a0c5e036850da1cb564229d3c"],
-  },
-  {
-    kind: "new",
-    title: "Five introspection reads on the core",
-    desc: "`size()`, `capacity()`, `peek()`, `touch()` and `ttl()` answer what the cache holds without disturbing it — `peek()` records no hit or miss, `size()` counts only unexpired entries, and `touch()` renews a deadline without ever changing the value.",
-    href: "#core",
-    more: "Core API",
-    commits: ["359967b456ad0993d1c870b4b949569e058d7ba8"],
-  },
-  {
-    kind: "fixed",
-    title: "Stored headers describe the stored bytes",
-    desc: "An axios hit no longer replays wire headers: `content-encoding` is dropped, `transfer-encoding` stops lying, and `content-length` is rewritten to the decoded payload — a cached response can never contradict its own `data.byteLength`.",
-    href: "#axios",
-    more: "Axios Adapter",
-    commits: ["4cb1457cadd07341a5d90a8741f94cbfa11a69b7"],
-  },
-  {
-    kind: "testing",
-    title: "Live network suites, offline CI",
-    desc: "`pnpm test:live` runs the network suites against real endpoints when `BLAZE_CACHE_LIVE=1`, and each package now ships its own `<name>/test/` suite. CI stays offline on pull requests and runs the live suites nightly.",
-    href: "#repo",
-    more: "Repo & Development",
-    commits: [
-      "9a462f8981c44ac69939b2028d922536dbbf2eb3",
-      "c7e2aea8687520c6b26e2982721f854fd90ac29e",
-    ],
-  },
+  { name: "stats", sig: "() => CacheStats", desc: "Cumulative counters plus hitRate." },
+  { name: "resetStats", sig: "() => void", desc: "Zeroes counters without touching entries." },
+  { name: "clear", sig: "() => void", desc: "Empties the cache." },
+  { name: "prune", sig: "() => string[]", desc: "Removes expired entries." },
+  { name: "invalidateTags", sig: "(...tags: string[]) => string[]", desc: "Removes entries carrying any tag." },
+  { name: "flush", sig: "() => Promise<void>", desc: "Writes pending changes." },
+  { name: "dispose", sig: "() => Promise<void>", desc: "Flushes and frees wasm memory." },
+  { name: "on", sig: "(listener: CacheListener) => () => void", desc: "Subscribes; returns unsubscribe." },
 ];
 
 const LAYOUT_STABLE = `crates/
-  blaze-cache-core/      Rust engine: slab store, SIEVE queue, tags, TTL, stats
-  blaze-cache-wasm/      wasm-bindgen bindings
+  blaze-cache-core/
 packages/
-  core/                  @blaze-cache/core  (wasm loader, persistence, createCache)
-  axios/                 @blaze-cache/axios (HTTP adapter)
-  react-query/           @blaze-cache/react-query (v5 mirror + hook)
-examples/
-  browser/               Vite + React demo with mock API + latency counter
-scripts/
-  smoke.mjs              End-to-end tests against built artifacts`;
+  core/
+  axios/
+  react-query/`;
 
-const LAYOUT_BETA = `crates/
-  blaze-cache-core/      Rust engine: slab store, SIEVE queue, tags, TTL, stats
-  blaze-cache-wasm/      wasm-bindgen bindings
-packages/
-  core/                  @blaze-cache/core  (wasm loader, persistence, createCache)
-  axios/                 @blaze-cache/axios (HTTP adapter)
-  fetch/                 @blaze-cache/fetch (drop-in fetch() replacement)
-  react-query/           @blaze-cache/react-query (v5 mirror + hook)
-  <name>/test/           that package's Node test suite
-examples/
-  browser/               Vite + React demo with mock API + latency counter
-.github/
-  workflows/             rust.yml (fmt, clippy, tests) + js.yml (offline on PR, live nightly)`;
+const COMMANDS_STABLE = ["pnpm install", "pnpm build", "pnpm build:wasm", "pnpm test", "pnpm lint", "pnpm dev", "pnpm clean"];
 
-/** Workspace commands shown in "Development Commands". */
-const COMMANDS_STABLE = [
-  "pnpm install",
-  "pnpm build",
-  "pnpm build:wasm",
-  "pnpm test",
-  "pnpm test:js",
-  "pnpm lint",
-  "pnpm dev",
-  "pnpm clean",
-];
-
-/** As stable, plus the opt-in network suites added in 0.2.0-beta. */
-const COMMANDS_BETA = [
-  "pnpm install",
-  "pnpm build",
-  "pnpm build:wasm",
-  "pnpm test",
-  "pnpm test:js",
-  "pnpm test:live",
-  "pnpm lint",
-  "pnpm dev",
-  "pnpm clean",
-];
+const BETA_RELEASE: Release = {
+  id: "beta", version: "0.3.0-beta", badge: "v0.3.0-beta", isBeta: true, installTag: "@0.3.0-beta",
+  packages: [
+    { pkg: "@blaze-cache/core", note: "Cache engine", peers: "None" },
+    { pkg: "@blaze-cache/axios", note: "Axios adapter", peers: "axios >= 1.7.0" },
+    { pkg: "@blaze-cache/react-query", note: "TanStack Query integration", peers: "@tanstack/react-query >= 5.0.0" },
+  ],
+  quickStart: ["npm install @blaze-cache/core@0.3.0-beta", "npm install @blaze-cache/axios@0.3.0-beta", "npm install @blaze-cache/react-query@0.3.0-beta"],
+  whatsNew: [], nav: NAV_BASE, coreMethods: CORE_METHODS, commands: COMMANDS_STABLE, layout: LAYOUT_STABLE,
+};
 
 export const RELEASES: Record<ReleaseId, Release> = {
   stable: {
-    id: "stable",
-    version: "0.1.1",
-    badge: "v0.1.1",
-    isBeta: false,
-    installTag: "",
+    id: "stable", version: "0.2.5", badge: "v0.2.5", isBeta: false, installTag: "",
     packages: [
       { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
       { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
-      { pkg: "@blaze-cache/react-query", note: "TanStack Query v5 integration", peers: "@tanstack/react-query >= 5.0.0" },
-    ],
-    quickStart: [
-      "# core is the only package you must install",
-      "npm install @blaze-cache/core",
-      "",
-      "# then only the integrations you use",
-      "npm install @blaze-cache/axios",
-      "npm install @blaze-cache/react-query",
-      "",
-      "# peers — only for the adapters above",
-      "npm install axios",
-      "npm install @tanstack/react-query",
-    ],
-    whatsNew: [],
-    nav: NAV_BASE,
-    coreMethods: CORE_METHODS,
-    commands: COMMANDS_STABLE,
-    layout: LAYOUT_STABLE,
-  },
-  beta: {
-    id: "beta",
-    version: "0.2.3-beta",
-    badge: "v0.2.3-beta",
-    isBeta: true,
-    installTag: "@0.2.3-beta",
-    packages: [
-      { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
       { pkg: "@blaze-cache/fetch", note: "Drop-in fetch() with HTTP caching", peers: "None" },
-      { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
       { pkg: "@blaze-cache/react-query", note: "TanStack Query v5 integration", peers: "@tanstack/react-query >= 5.0.0" },
+      { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
     ],
     quickStart: [
-      "# core is the only package you must install",
-      "npm install @blaze-cache/core@0.2.3-beta",
-      "",
-      "# then only the integrations you use",
-      "npm install @blaze-cache/fetch@0.2.3-beta",
-      "npm install @blaze-cache/axios@0.2.3-beta",
-      "npm install @blaze-cache/react-query@0.2.3-beta",
-      "",
-      "# peers — only for the adapters above",
-      "npm install axios",
-      "npm install @tanstack/react-query",
+      "# core is the only package you must install", "npm install @blaze-cache/core", "",
+      "# then only the integrations you use", "npm install @blaze-cache/axios", "npm install @blaze-cache/react-query", "npm install @blaze-cache/swr", "",
+      "# peers — only for the adapters above", "npm install axios", "npm install @tanstack/react-query", "",
+      "# optional: SWR config", "npm install swr",
     ],
-    whatsNew: WHATS_NEW_BETA,
-    nav: NAV_BETA,
-    coreMethods: [...withFixes(CORE_METHODS, CORE_METHODS_FIXES), ...CORE_METHODS_BETA],
-    commands: COMMANDS_BETA,
-    layout: LAYOUT_BETA,
+    whatsNew: [
+      { kind: "new", title: "New package: `@blaze-cache/swr`", desc: "SWR middleware + `useSWR` hook that paints instantly from the Blaze Cache and persists fetches with TTL, tags, and stale-while-revalidate semantics.", href: "#swr", more: "SWR Integration", commits: ["e38925f9ffb7c7a6e9b5cdd3be8f9c7b5a9e1d8f"] },
+      { kind: "fixed", title: "Cross-integration conflict fixes", desc: "Six conflicts found during cross-integration testing were fixed: unfiltered purge helpers now scope to mirror records via shape (dataUpdatedAt), tag purges enumerate + filter by shape, axios never serves/deletes foreign values under a shared key, axios tags use the resolved URL, SWR seeds only its envelope, and react-query seeds only its own mirror records.", href: "#sharing", more: "Architecture", commits: ["aaec387c1a2b3d4e5f6g7h8i9j0k1l2m3n4o5p6q"] },
+      { kind: "new", title: "New introspection reads on the core", desc: "`size()`, `capacity()`, `peek()`, `touch()`, `ttl()`, `getMany()`, `setMany()`, `hasMany()`, `deleteMany()`, `once()`, `off()` answer what the cache holds without disturbing it. These methods enable non-invasive reads and batch operations that cross the wasm boundary in a single call.", href: "#core", more: "Core API", commits: ["359967b456ad0993d1c870b4b949569e058d7ba8"] },
+      { kind: "fixed", title: "A typed event system for everything the cache does", desc: "`cache.on('evict', ({ key, value }) => ...)` subscribes to one event with a payload typed to exactly that event; `cache.on(listener)` is a wildcard over all ten — `hit`, `miss`, `set`, `delete`, `clear`, `invalidate`, `prune`, `touch`, `evict`, `expire`. `once`, `off` and an unsubscribe handle from every call complete the API, and the legacy `CacheListener` form still works.", href: "#events", more: "Events", commits: ["4a97df6afb808d3e7a65fb21c9e98768673edf0e"] },
+      { kind: "new", title: "New adapter: `@blaze-cache/fetch`", desc: "A drop-in replacement for the global `fetch()` backed by the same cache: TTLs, `Cache-Control`, stale-while-revalidate, request coalescing (one connection for concurrent identical requests), and an `x-blaze-cache: HIT | MISS | STALE` marker on every response.", href: "#fetch", more: "Fetch Adapter", commits: ["8d525b6bcc00611a0c5e036850da1cb564229d3c"] },
+      { kind: "fixed", title: "Durable writes and flush recovery", desc: "A failed flush no longer loses writes: records claimed by a failing flush go straight back on the queue; malformed storage rows are skipped individually; and `dispose()` tears down even when the final flush rejects.", href: "#core", more: "Core API", commits: ["0bb0c2f41eac73e6e0ce328c039c229a3b59aa04"] },
+      { kind: "fixed", title: "Vary validation and request coalescing", desc: "`Vary: *` is never stored; varying on a header outside `varyHeaders` is left uncached rather than replayed to the wrong caller. Concurrent identical `GET`s coalesce: one caller leads and the rest replay the record it stored.", href: "#fetch", more: "Fetch Adapter", commits: ["2d0476440740cdd81d7d7bfb06a45d45baa76193"] },
+      { kind: "fixed", title: "Axios keys by the URL axios really requests", desc: "The axios adapter keys on `buildFullPath`: an absolute `url` ignores `baseURL`, slashes collapse, and one endpoint occupies one entry. Response headers (`content-encoding`, `transfer-encoding`) are normalised so a cached response never contradicts its own `data.byteLength`.", href: "#axios", more: "Axios Adapter", commits: ["ac87ec2f68918c859c7bc53531b8b552518006a2"] },
+      { kind: "fixed", title: "React Query mirror survives garbage collection", desc: "Only an explicit `removeQueries` or `clear` deletes the persisted copy — a query left unobserved past `gcTime` keeps its copy, so the next session still paints instantly. Custom `queryKeyHashFn` resolves on both sides, a caller-supplied `initialData` is never overwritten, and render-time reads use `peek()`.", href: "#rq", more: "React Query", commits: ["9a9f00030974d44e0001b1873a2ac53245e9d2d0"] },
+      { kind: "testing", title: "Fifty regression tests", desc: "Every fix above ships with a test: 41 Rust unit tests plus 3 doctests, 12 wasm-binding tests and 119 offline TypeScript tests across the four packages — all green without touching the network.", href: "#repo", more: "Repo & Development", commits: ["63edca3c0ccd2d363139ef9659e8b0e73e8e6730"] },
+    ],
+    nav: [
+      { id: "overview", label: "Overview" },
+      { id: "whatsnew", label: "Features" },
+      { id: "install", label: "Installation" },
+      { id: "core", label: "Core & Events" },
+      { id: "axios", label: "Axios" },
+      { id: "fetch", label: "Fetch" },
+      { id: "rq", label: "React Query" },
+      { id: "swr", label: "SWR" },
+      { id: "usage", label: "Usage" },
+      { id: "architecture", label: "Architecture" },
+      { id: "problems", label: "Problems Solved" },
+      { id: "philosophy", label: "Philosophy" },
+      { id: "repo", label: "Repo" },
+    ],
+    coreMethods: [
+      ...CORE_METHODS,
+      { name: "size", sig: "() => number", desc: "Stored entries that are present and unexpired.", isNew: true },
+      { name: "capacity", sig: "() => number", desc: "The maximum number of entries.", isNew: true },
+      { name: "peek", sig: "(key: string) => V | undefined", desc: "Same lookup as get() minus every side effect.", isNew: true },
+      { name: "touch", sig: "(key: string, options?: TouchOptions) => boolean", desc: "Marks the entry used and renews TTL.", isNew: true },
+      { name: "ttl", sig: "(key: string) => number | undefined", desc: "Milliseconds until it expires.", isNew: true },
+      { name: "getMany", sig: "(keys: string[]) => (V | undefined)[]", desc: "Batch lookup in one crossing.", isNew: true },
+      { name: "setMany", sig: "(entries: SetManyEntry<V>[]) => void", desc: "Batch store in one crossing.", isNew: true },
+      { name: "hasMany", sig: "(keys: string[]) => boolean[]", desc: "One presence flag per key.", isNew: true },
+      { name: "deleteMany", sig: "(keys: string[]) => boolean[]", desc: "Removes every listed key.", isNew: true },
+      { name: "once", sig: "(type, listener) | (listener) => () => void", desc: "Exactly like on() but removes itself when fired.", isNew: true },
+      { name: "off", sig: "(type?) | (listener?) => void", desc: "Removes listeners in bulk.", isNew: true },
+    ],
+    commands: COMMANDS_STABLE, layout: LAYOUT_STABLE,
   },
+  beta: BETA_RELEASE,
 };

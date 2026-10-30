@@ -95,9 +95,8 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
           </div>
           {/* Version switcher — stable tracks npm's `latest` tag, beta tracks `@beta`. Labels come
               from the release record, so a version bump happens in exactly one place. */}
-          <nav aria-label="Documentation version" className="hidden items-center rounded-lg border border-[#2a1818] bg-[#121012] p-0.5 lg:flex">
-            <VersionLink to="/" active={!isBeta}>{RELEASES.stable.badge}</VersionLink>
-            <VersionLink to="/beta" active={isBeta}>{RELEASES.beta.badge}</VersionLink>
+          <nav aria-label="Documentation version" className="hidden items-center rounded-lg border border-[#2a1818] bg-[#121012] p-0.5 px-3 lg:flex">
+            <VersionLink to="/" active>{RELEASES.stable.badge}</VersionLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#2a1818] bg-[#121012] text-[#f2f0eb] hover:bg-[#8a1e2e] hover:text-white" aria-label="Open menu"><Menu size={18} /></button>
@@ -126,8 +125,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
             <div className="mt-6 border-t border-[#2a1818] pt-5">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Docs version</p>
               <div className="flex flex-wrap gap-2 px-1">
-                <VersionLink to="/" active={!isBeta}>{RELEASES.stable.badge} (stable)</VersionLink>
-                <VersionLink to="/beta" active={isBeta}>{RELEASES.beta.badge}</VersionLink>
+                <VersionLink to="/" active>{RELEASES.stable.badge}</VersionLink>
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
@@ -145,9 +143,16 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
               <div className="relative pl-4">
                 {/* Vertical line */}
                 <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-[#2a1818] rounded-full" />
-                {navItems.map((n) => {
-                  const active = activeId === n.id
+                {navItems.map((n, idx) => {
+                  const active = activeId === n.id;
+                  const group = n.id === "core" ? "Core" : n.id === "rq" || n.id === "swr" || n.id === "axios" || n.id === "fetch" ? "Adapters" : n.id === "usage" ? "Usage" : n.id === "repo" ? "Repo" : "";
+                  const prev = navItems[idx - 1];
+                  const prevGroup = prev ? (prev.id === "core" ? "Core" : prev.id === "rq" || prev.id === "swr" || prev.id === "axios" || prev.id === "fetch" ? "Adapters" : prev.id === "usage" ? "Usage" : prev.id === "repo" ? "Repo" : "") : "";
                   return (
+                    <>
+                      {group && group !== prevGroup && (
+                        <div className="mt-3 mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-[#8a1e2e]">{group}</div>
+                      )}
                     <a key={n.id} href={`#${n.id}`} className="relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors mb-1 group">
                       {/* Dot */}
                       <span className={`absolute -left-[11px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full border-2 shadow-md transition-all duration-300 z-10 ${active ? "bg-[#8a1e2e] border-[#8a1e2e] shadow-[#8a1e2e]/40 scale-125" : "bg-[#121012] border-[#3a1818] group-hover:border-[#8a1e2e]"}`} />
@@ -156,6 +161,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                         {n.label}
                       </span>
                     </a>
+                    </>
                   )
                 })}
               </div>
@@ -172,9 +178,8 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
               </div>
             ) : (
               <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#2a1818] bg-[#121012] px-5 py-4 text-sm text-muted-foreground">
-                <Badge variant="outline">preview</Badge>
-                <span>{RELEASES.beta.badge} adds the <code className="font-mono text-foreground">@blaze-cache/fetch</code> adapter, a typed event system, five introspection reads, and a hardening pass over <code className="font-mono text-foreground">Vary</code>, request coalescing and durable writes.</span>
-                <Link to="/beta" className="font-medium text-[#f2f0eb] underline underline-offset-4 hover:text-white">Open the beta docs →</Link>
+                <Badge variant="outline">stable</Badge>
+                <span>Documenting release <strong>{release.badge}</strong>.</span>
               </div>
             )}
 
@@ -351,9 +356,8 @@ const cache = await createCache({
 
             <Separator className="my-16 bg-[#2a1818]" />
 
-            {/* Events (beta only) */}
-            {isBeta && (
-              <>
+            {/* Events */}
+            <>
                 <section id="events" className="mb-20 scroll-mt-28">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#8a1e2e]/20 text-[#8a1e2e] shadow-lg shadow-[#8a1e2e]/10"><Radio size={20} /></div>
@@ -448,7 +452,6 @@ offEvict();           // …or just this one handle (idempotent)`} />
 
                 <Separator className="my-16 bg-[#2a1818]" />
               </>
-            )}
 
             {/* Axios */}
             <section id="axios" className="mb-20 scroll-mt-28">
@@ -583,8 +586,7 @@ const api = axios.create({
 
             <Separator className="my-16 bg-[#2a1818]" />
 
-            {isBeta && (
-              <>
+            <>
                 <section id="fetch" className="mb-20 scroll-mt-28">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#8a1e2e]/20 text-[#8a1e2e] shadow-lg shadow-[#8a1e2e]/10"><Globe size={20} /></div>
@@ -691,7 +693,6 @@ cache.invalidateTags('fetch');`} />
 
                 <Separator className="my-16 bg-[#2a1818]" />
               </>
-            )}
 
             {/* React Query */}
             <section id="rq" className="mb-20 scroll-mt-28">
@@ -712,17 +713,87 @@ cache.invalidateTags('fetch');`} />
                   <CardHeader><CardTitle>syncBlazeQueryCache</CardTitle><CardDescription>Manual event subscription.</CardDescription></CardHeader>
                   <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]">const unsub = syncBlazeQueryCache(client, &#123; cache &#125;)</pre><CopyButton text="const unsub = syncBlazeQueryCache(client, { cache })" /></CardContent>
                 </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>useBlazeInfiniteQuery</CardTitle><CardDescription>Infinite scroll that seeds from the mirror.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`const { data } = useBlazeInfiniteQuery(cache, { queryKey: ['posts'], queryFn })`}</code></pre><CopyButton text={`const { data } = useBlazeInfiniteQuery(cache, { queryKey: ['posts'], queryFn })`} /></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>useBlazeMutation</CardTitle><CardDescription>Invalidates both caches after a successful mutation.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`const mutation = useBlazeMutation(cache, { mutationFn })`}</code></pre><CopyButton text={`const mutation = useBlazeMutation(cache, { mutationFn })`} /></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>useBlazeQueries</CardTitle><CardDescription>Batch of queries, all painting from the mirror.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`const results = useBlazeQueries(cache, [{ queryKey, queryFn }])`}</code></pre><CopyButton text={`const results = useBlazeQueries(cache, [{ queryKey, queryFn }])`} /></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>prefetchBlazeQuery</CardTitle><CardDescription>Imperative prefetch that writes to the mirror.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`await prefetchBlazeQuery(queryClient, { queryKey, queryFn })`}</code></pre><CopyButton text={`await prefetchBlazeQuery(queryClient, { queryKey, queryFn })`} /></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>dehydrate / hydrate</CardTitle><CardDescription>Persistence round trip for SSR / reload.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]">const state = dehydrateBlazeQueryClient(queryClient); hydrateBlazeQueryClient(queryClient, state);</pre><CopyButton text="const state = dehydrateBlazeQueryClient(queryClient); hydrateBlazeQueryClient(queryClient, state);" /></CardContent>
+                </Card>
               </div>
-              {isBeta && (
-                <p className="mt-6 max-w-3xl text-muted-foreground">
-                  From {release.badge} the mirror only loses a query to an explicit{" "}
-                  <code>removeQueries</code> or <code>clear</code>: a query left unobserved past{" "}
-                  <code>gcTime</code> keeps its copy, so the next session still paints instantly.
-                  Lookups honour a custom <code>queryKeyHashFn</code>, a caller-supplied{" "}
-                  <code>initialData</code> is never overwritten, and the render-time read goes
-                  through <code>peek()</code> so a StrictMode double render cannot move the hit rate.
-                </p>
-              )}
+              <p className="mt-6 max-w-3xl text-muted-foreground">
+                    The mirror only loses a query to an explicit{" "}
+                    <code>removeQueries</code> or <code>clear</code>: a query left unobserved past{" "}
+                    <code>gcTime</code> keeps its copy, so the next session still paints instantly.
+                    Lookups honour a custom <code>queryKeyHashFn</code>, a caller-supplied{" "}
+                    <code>initialData</code> is never overwritten, and the render-time read goes
+                    through <code>peek()</code> so a StrictMode double render cannot move the hit rate.
+                  </p>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                      { name: "Mirror persistence", desc: "Only explicit removeQueries / clear deletes the persisted copy — unobserved past gcTime still paints instantly." },
+                      { name: "Custom queryKeyHashFn", desc: "Resolved on both sides so your custom key matches the stored record exactly." },
+                      { name: "initialData preserved", desc: "Caller-supplied initialData is never overwritten by the mirror." },
+                      { name: "peek() reads", desc: "Render-time lookups go through peek() so StrictMode cannot shift hit/miss counts." },
+                    ].map((f) => (
+                      <div key={f.name} className="rounded-xl border border-[#2a1818] bg-[#121012] px-4 py-3 shadow-sm hover:border-[#8a1e2e] transition-colors">
+                        <div className="font-mono text-sm font-semibold text-[#f2f0eb]">{f.name}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{f.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+            </section>
+
+            {/* SWR */}
+            <section id="swr" className="mb-20 scroll-mt-28">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#8a1e2e]/20 text-[#8a1e2e] shadow-lg shadow-[#8a1e2e]/10"><Component size={20} /></div>
+                <h3 className="text-3xl font-extrabold tracking-tight">SWR</h3>
+              </div>
+              <p className="text-muted-foreground mb-6 max-w-3xl">
+                The <code className="text-amber-200">@blaze-cache/swr</code> package gives SWR the same persistent backing that the other adapters get — a first render from the Blaze Cache, followed by a background revalidate that writes back with TTL and tags.
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>useBlazeSWR</CardTitle><CardDescription>Hook that paints instantly from Blaze Cache.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`const { data } = useBlazeSWR(cache, '/api/users', fetcher, { ttlMs: 60_000, tags: ['users'] })`}</code></pre><CopyButton text={`const { data } = useBlazeSWR(cache, '/api/users', fetcher, { ttlMs: 60_000, tags: ['users'] })`} /></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>blazeSWRMiddleware</CardTitle><CardDescription>Wires the same behaviour into SWRConfig.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`SWRConfig value={{ provider: () => new Map(), use: [blazeSWRMiddleware({ cache })] }}`}</code></pre><CopyButton text={`SWRConfig value={{ provider: () => new Map(), use: [blazeSWRMiddleware({ cache })] }}`} /></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>resolveBlazeKey</CardTitle><CardDescription>Imperative key for direct cache reads.</CardDescription></CardHeader>
+                  <CardContent className="relative"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#0a0a0b] p-3 text-xs font-mono border border-[#2a1818]"><code>{`cache.get(resolveBlazeKey('/api/users'))`}</code></pre><CopyButton text={`cache.get(resolveBlazeKey('/api/users'))`} /></CardContent>
+                </Card>
+              </div>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { name: "ttlMs", sig: "number", desc: "Freshness in ms. Default 60_000; a revalidated response writes back with its own TTL." },
+                  { name: "tags", sig: "string[]", desc: "Tags on stored responses. Default ['swr', '<key>'] — drop with cache.invalidateTags()." },
+                  { name: "staleWhileRevalidate", sig: "boolean | number", desc: "Serve past freshness while a background refresh runs, just like the fetch adapter." },
+                  { name: "seed", sig: "(key, data) => void", desc: "Optional seed that writes a persistent record without fetching — useful for SSR or hydrated data." },
+                ].map((o) => (
+                  <div key={o.name} className="text-left rounded-xl border border-[#2a1818] bg-[#121012] px-4 py-3 shadow-sm hover:border-[#8a1e2e] transition-colors group">
+                    <div className="font-mono text-sm font-semibold text-[#f2f0eb] group-hover:text-[#fff5f0]">{o.name}</div>
+                    <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                    <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <Separator className="my-16 bg-[#2a1818]" />
@@ -818,6 +889,34 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
               </div>
             </section>
 
+            {/* Philosophy */}
+            <section id="philosophy" className="mb-20 scroll-mt-28">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#8a1e2e]/20 text-[#8a1e2e] shadow-lg shadow-[#8a1e2e]/10"><Flame size={20} /></div>
+                <h3 className="text-3xl font-extrabold tracking-tight">Philosophy</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>One core, many adapters</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground">A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, TanStack Query or SWR, the same persistence, stats, and eviction model applies.</p></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>Synchronous hot path</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground">After initialization, every read and write is fully synchronous — no Promises on the hot path. The Wasm module loads once; the rest is pure JS.</p></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>Durable by default</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground">Optional IndexedDB persistence hydrates before the first get, writes are debounced, and flush recoveries mean a failed flush never loses data.</p></CardContent>
+                </Card>
+                <Card className="border-[#2a1818] bg-[#121012]">
+                  <CardHeader><CardTitle>Observable and typed</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground">Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload, or to all events at once — and they never block mutations.</p></CardContent>
+                </Card>
+              </div>
+            </section>
+
+            <Separator className="my-16 bg-[#2a1818]" />
+
             {/* Repo & Development */}
             <section id="repo" className="mb-20 scroll-mt-28">
               <div className="flex items-center gap-3 mb-6">
@@ -885,7 +984,6 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 </div>
                 <div className="flex gap-6">
               <a href="https://github.com/blaze-cache/blaze-cache" target="_blank" rel="noreferrer" className="hover:text-foreground">GitHub</a>
-                  <Link to={isBeta ? "/" : "/beta"} className="hover:text-foreground">{isBeta ? "Stable docs" : "Beta docs"}</Link>
                   <a href="#overview" className="hover:text-foreground">Overview</a>
                   <a href="#install" className="hover:text-foreground">Install</a>
                   <a href="#core" className="hover:text-foreground">API</a>
