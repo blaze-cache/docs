@@ -731,7 +731,7 @@ cache.invalidateTags('fetch');`} />
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Ky Adapter</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in beta</Badge>
+                    {isBeta && <Badge className="text-xs px-2 py-0.5">New in beta</Badge>}
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     The <code className="text-flame">@blaze-cache/ky</code> package caches ky
