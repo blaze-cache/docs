@@ -118,7 +118,7 @@ const BETA_RELEASE: Release = {
     { kind: "testing", title: "Twenty-five regression tests", desc: "Every fix above ships with a test: the offline matrix now runs 284 TypeScript tests across the six packages plus 45 Rust tests — all green, none touching the network.", href: "#repo", more: "Repo & Development", commits: ["c29f479", "376158e", "b459222", "075b095", "8b86546", "757cbb4"] },
   ],
   nav: NAV_CURRENT,
-  coreMethods: [...CORE_METHODS, ...INTROSPECTION],
+  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false }))],
   commands: COMMANDS_STABLE, layout: LAYOUT,
 };
 
