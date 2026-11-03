@@ -6,8 +6,10 @@ Built with:
 - React + TypeScript + Vite
 - Tailwind CSS v4
 - shadcn/ui-style components (Card, Badge, Button, Separator)
-- Slate dark theme (`#020617` background, `#0f172a` surfaces) with the Blaze crimson flame as the accent
-- IBM Plex Sans for prose, JetBrains Mono for code and section headings
+- vite.dev-style surfaces (flat, border-driven) with a light/dark theme toggle: light base is white text on `#3c3c43`, dark is `#16171d` with `#14121a` cards — Blaze crimson (`#8a1e2e` / `#e8a0aa`) stays the accent
+- System font stacks (no web fonts): system-ui for prose, ui-monospace for code and section headings
+- Theme resolves from a saved choice, then OS preference; the toggle persists to localStorage
+- Tailwind CSS v4 with `cn()` routed through `tailwind-merge` so call-site overrides win
 
 ## Features
 
@@ -16,7 +18,7 @@ Built with:
 - Interactive scroll-tracking indicator (dots highlight active section)
 - Mobile drawer navigation
 - Copy-to-clipboard buttons on all code snippets
-- Sections: Overview, What's New (beta), Installation, Core API, Axios Adapter, Fetch Adapter (beta), React Query, Usage, Architecture, Problems Solved, Repo & Development
+- Sections: Overview, What's New (beta), Installation, Core API, Axios Adapter, Fetch Adapter (beta), Ky Adapter (beta), React Query, Usage, Architecture (animated SVG), Problems Solved, Repo & Development
 
 ## Updating a release
 
