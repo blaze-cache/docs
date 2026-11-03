@@ -727,6 +727,8 @@ cache.invalidateTags('fetch');`} />
                   </div>
                 </section>
 
+                {isBeta && (
+                  <>
                 <section id="ky" className="mb-20 scroll-mt-28">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
@@ -844,6 +846,9 @@ const users = await api.get('users').json();`} />
                     </p>
                   )}
                 </section>
+
+                  </>
+                )}
 
                 <Separator className="my-16 bg-border" />
               </>

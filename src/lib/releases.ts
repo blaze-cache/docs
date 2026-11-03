@@ -31,6 +31,9 @@ const NAV_CURRENT: NavItem[] = [
   { id: "repo", label: "Repo" },
 ];
 
+/** Stable nav excludes beta-only sections (e.g. the Ky adapter). */
+const NAV_STABLE: NavItem[] = NAV_CURRENT.filter((n) => n.id !== "ky");
+
 const CORE_METHODS: MethodInfo[] = [
   { name: "get", sig: "(key: string) => V | undefined", desc: "Value stored under key, or undefined when missing/expired. Counts as hit/miss." },
   { name: "set", sig: "(key: string, value: V, options?: SetOptions) => void", desc: "Stores or replaces key. Replacing refreshes TTL and replaces tags." },
@@ -147,7 +150,7 @@ export const RELEASES: Record<ReleaseId, Release> = {
       { kind: "fixed", title: "React Query mirror survives garbage collection", desc: "Only an explicit `removeQueries` or `clear` deletes the persisted copy — a query left unobserved past `gcTime` keeps its copy, so the next session still paints instantly. Custom `queryKeyHashFn` resolves on both sides, a caller-supplied `initialData` is never overwritten, and render-time reads use `peek()`.", href: "#rq", more: "React Query", commits: ["9a9f00030974d44e0001b1873a2ac53245e9d2d0"] },
       { kind: "testing", title: "Fifty regression tests", desc: "Every fix above ships with a test: 41 Rust unit tests plus 3 doctests, 12 wasm-binding tests and 119 offline TypeScript tests across the four packages — all green without touching the network.", href: "#repo", more: "Repo & Development", commits: ["63edca3c0ccd2d363139ef9659e8b0e73e8e6730"] },
     ],
-    nav: NAV_CURRENT,
+    nav: NAV_STABLE,
     coreMethods: [...CORE_METHODS, ...INTROSPECTION],
     commands: COMMANDS_STABLE, layout: LAYOUT,
   },
