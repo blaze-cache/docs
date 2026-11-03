@@ -95,8 +95,9 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
           </div>
           {/* Version switcher — stable tracks npm's `latest` tag, beta tracks `@beta`. Labels come
               from the release record, so a version bump happens in exactly one place. */}
-          <nav aria-label="Documentation version" className="hidden items-center rounded-lg border border-[#2a1818] bg-[#121012] p-0.5 px-3 lg:flex">
-            <VersionLink to="/" active>{RELEASES.stable.badge}</VersionLink>
+          <nav aria-label="Documentation version" className="hidden items-center gap-1 rounded-lg border border-[#2a1818] bg-[#121012] p-0.5 px-3 lg:flex">
+            <VersionLink to="/" active={!isBeta}>{RELEASES.stable.badge}</VersionLink>
+            <VersionLink to="/beta" active={isBeta}>{RELEASES.beta.badge}</VersionLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#2a1818] bg-[#121012] text-[#f2f0eb] hover:bg-[#8a1e2e] hover:text-white" aria-label="Open menu"><Menu size={18} /></button>
@@ -125,7 +126,8 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
             <div className="mt-6 border-t border-[#2a1818] pt-5">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Docs version</p>
               <div className="flex flex-wrap gap-2 px-1">
-                <VersionLink to="/" active>{RELEASES.stable.badge}</VersionLink>
+                <VersionLink to="/" active={!isBeta}>{RELEASES.stable.badge}</VersionLink>
+                <VersionLink to="/beta" active={isBeta}>{RELEASES.beta.badge}</VersionLink>
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
@@ -236,9 +238,18 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                     <Badge variant="outline" className="text-[11px]">{release.badge}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
-                    Everything the 0.2 line adds over the stable {RELEASES.stable.badge} — newest
-                    first, {release.badge} at the top — each card linking to the section that
-                    documents it.
+                    {isBeta ? (
+                      <>
+                        Everything <strong className="text-foreground">{release.badge}</strong> adds over
+                        the stable {RELEASES.stable.badge} — newest first, each card linking to the
+                        section that documents it.
+                      </>
+                    ) : (
+                      <>
+                        What shipped in <strong className="text-foreground">{release.badge}</strong> —
+                        newest first, each card linking to the section that documents it.
+                      </>
+                    )}
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {release.whatsNew.map((item) => (
@@ -832,7 +843,7 @@ cache.on((event) => console.log(event.type));   // wildcard — every event` : `
                 </Card>
                 {isBeta && (
                   <Card className="border-[#2a1818] bg-[#121012]">
-                    <CardHeader><CardTitle>Introspection without side effects</CardTitle><CardDescription>New in the 0.2 line — none of these records a hit or a miss.</CardDescription></CardHeader>
+                    <CardHeader><CardTitle>Introspection without side effects</CardTitle><CardDescription>New in the 0.3 line — none of these records a hit or a miss.</CardDescription></CardHeader>
                     <CardContent className="relative">
                       <pre className="overflow-x-auto rounded-lg bg-[#0a0a0b] p-4 text-sm font-mono leading-7 border border-[#2a1818] text-[#e8cfc8]"><code>{`cache.size();                                // entries present and unexpired
 cache.capacity();                           // the maximum you configured
