@@ -79,8 +79,11 @@ packages/
 
 const COMMANDS_STABLE = ["pnpm install", "pnpm build", "pnpm build:wasm", "pnpm test", "pnpm lint", "pnpm dev", "pnpm clean"];
 
+// The published prerelease on npm is `0.3.0-beta.0`, but the docs label the
+// release `0.3.0-beta` (matching the 0.2.x-beta pattern) and install through
+// the `beta` dist-tag — a literal `@0.3.0-beta` would 404 on the registry.
 const BETA_RELEASE: Release = {
-  id: "beta", version: "0.3.0-beta.0", badge: "v0.3.0-beta.0", isBeta: true, installTag: "@0.3.0-beta.0",
+  id: "beta", version: "0.3.0-beta", badge: "v0.3.0-beta", isBeta: true, installTag: "@beta",
   packages: [
     { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
     { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
@@ -90,13 +93,13 @@ const BETA_RELEASE: Release = {
     { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
   ],
   quickStart: [
-    "# core is the only package you must install", "npm install @blaze-cache/core@0.3.0-beta.0", "",
+    "# core is the only package you must install", "npm install @blaze-cache/core@beta", "",
     "# then only the integrations you use",
-    "npm install @blaze-cache/axios@0.3.0-beta.0",
-    "npm install @blaze-cache/fetch@0.3.0-beta.0",
-    "npm install @blaze-cache/ky@0.3.0-beta.0",
-    "npm install @blaze-cache/react-query@0.3.0-beta.0",
-    "npm install @blaze-cache/swr@0.3.0-beta.0", "",
+    "npm install @blaze-cache/axios@beta",
+    "npm install @blaze-cache/fetch@beta",
+    "npm install @blaze-cache/ky@beta",
+    "npm install @blaze-cache/react-query@beta",
+    "npm install @blaze-cache/swr@beta", "",
     "# peers — only for the adapters above", "npm install axios", "npm install ky", "npm install @tanstack/react-query", "",
     "# optional: SWR config", "npm install swr",
   ],
