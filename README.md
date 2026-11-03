@@ -6,7 +6,8 @@ Built with:
 - React + TypeScript + Vite
 - Tailwind CSS v4
 - shadcn/ui-style components (Card, Badge, Button, Separator)
-- Dark crimson theme matching the Blaze Cache logo
+- Slate dark theme (`#020617` background, `#0f172a` surfaces) with the Blaze crimson flame as the accent
+- IBM Plex Sans for prose, JetBrains Mono for code and section headings
 
 ## Features
 

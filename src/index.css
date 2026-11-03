@@ -1,25 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0a0a0b;
-  --color-foreground: #f2f0eb;
-  --color-card: #121012;
-  --color-card-foreground: #f2f0eb;
-  --color-popover: #121012;
-  --color-popover-foreground: #f2f0eb;
+  /* Slate neutrals (Modern / Swiss dark docs) with the Blaze crimson flame as the accent. */
+  --color-background: #020617;
+  --color-foreground: #f8fafc;
+  --color-card: #0f172a;
+  --color-card-foreground: #f8fafc;
+  --color-popover: #0f172a;
+  --color-popover-foreground: #f8fafc;
   --color-primary: #8a1e2e;
   --color-primary-foreground: #fff5f0;
-  --color-secondary: #1a1212;
-  --color-secondary-foreground: #e8cfc8;
-  --color-muted: #181011;
-  --color-muted-foreground: #b0a098;
-  --color-accent: #6b1020;
-  --color-accent-foreground: #fff5f0;
-  --color-destructive: #c43e3e;
+  --color-secondary: #1e293b;
+  --color-secondary-foreground: #e2e8f0;
+  --color-muted: #1a1e2f;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #1e293b;
+  --color-accent-foreground: #f8fafc;
+  --color-destructive: #ef4444;
   --color-destructive-foreground: #fff;
-  --color-border: #2a1818;
-  --color-input: #2a1818;
+  --color-border: #1e293b;
+  --color-input: #1e293b;
   --color-ring: #a0283a;
+  /* IBM Plex Sans for prose, JetBrains Mono for code and section headings. */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
@@ -28,19 +32,35 @@
 
 html { scroll-behavior: smooth; }
 body {
-  background-color: #0a0a0b;
-  color: #f2f0eb;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-::selection { background: rgba(138, 30, 46, 0.35); color: #fff; }
+::selection { background: rgba(138, 30, 46, 0.45); color: #fff; }
 
-/* Custom scrollbar */
+/* Keyboard focus must stay visible on every interactive element. */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Honour the OS reduced-motion preference: no smooth scrolling, no transitions. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+/* Custom scrollbar — slate track, crimson thumb */
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #0a0a0b; }
-::-webkit-scrollbar-thumb { background: #3a1818; border-radius: 4px; }
+::-webkit-scrollbar-track { background: #020617; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #8a1e2e; }
 
 /* Responsive code blocks */
