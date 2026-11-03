@@ -194,8 +194,9 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                 <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
                 <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-[#6b1020]/20 blur-3xl" />
                 <div className="relative">
-                  <h2 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] bg-gradient-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6">Blaze Cache</h2>
-                  <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl leading-relaxed">Blazingly fast client-side caching library powered by Rust → WebAssembly. Features synchronous reads, SIEVE eviction, tag invalidation, and optional IndexedDB persistence.</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-flame mb-4">Blaze Cache</p>
+                  <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] bg-gradient-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6 max-w-4xl">A full-featured client-side caching library for heavy data, offline-first apps, and high-performance browsers — powered by Rust → WebAssembly.</h2>
+                  <p className="text-lg md:text-xl text-muted-foreground max-w-3xl leading-relaxed">It combines synchronous reads and writes, SIEVE eviction, tag-based invalidation, optional IndexedDB persistence, and first-class adapters for tools like Axios, fetch, TanStack Query, and SWR — giving you a complete caching layer for real-world frontend apps.</p>
                   <div className="mt-8 flex flex-wrap gap-3">
                     <Badge className="text-sm px-3 py-1">Wasm hot path</Badge>
                     <Badge className="text-sm px-3 py-1">O(1) eviction</Badge>
