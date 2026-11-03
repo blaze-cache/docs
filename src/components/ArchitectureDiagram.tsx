@@ -1,89 +1,241 @@
-import { Globe, Link2, Box, Database, Clock, Tag, ArrowDown } from "lucide-react"
+/**
+ * Architecture diagram — a flat, border-driven SVG in the vite.dev style.
+ * Motion is pure CSS (marching dashes along the data path, a comet sweep
+ * across the Wasm bridge, a pulsing bridge node) and parks entirely under
+ * `prefers-reduced-motion`. Every colour comes from the theme tokens, so
+ * the diagram tracks the light/dark toggle.
+ */
+const ADAPTERS = [
+  { label: "Axios", cx: 120 },
+  { label: "Fetch", cx: 275 },
+  { label: "Ky", cx: 430 },
+  { label: "React Query", cx: 585 },
+  { label: "SWR", cx: 740 },
+]
+
+const SUBSYSTEMS = [
+  { title: "Slab", detail: "O(1) free list" },
+  { title: "SIEVE", detail: "scan-resistant" },
+  { title: "TTL", detail: "fast-path" },
+  { title: "Tags", detail: "monotonic IDs" },
+  { title: "Persistence", detail: "debounced" },
+]
+
+const ARCH_CSS = `
+  .arch-flow { stroke-dasharray: 5 7; animation: arch-dash 0.8s linear infinite; }
+  @keyframes arch-dash { to { stroke-dashoffset: -12; } }
+  .arch-comet { stroke-dasharray: 6 94; animation: arch-sweep 2.4s linear infinite; }
+  @keyframes arch-sweep { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+  .arch-pulse { animation: arch-pulse 2.4s ease-in-out infinite; }
+  @keyframes arch-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .arch-flow, .arch-comet, .arch-pulse { animation: none; }
+  }
+`
 
 export default function ArchitectureDiagram() {
   return (
-    <div className="rounded-3xl border border-border bg-background p-6 md:p-10 shadow-2xl shadow-[#8a1e2e]/10 overflow-hidden relative">
-      {/* Subtle glowing gradient overlay */}
-      <div className="absolute inset-0 pointer-events-none opacity-20" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(217,119,6,0.25), transparent 70%)' }} />
+    <div className="rounded-3xl border border-border bg-card p-6 md:p-10 overflow-hidden">
+      <svg
+        viewBox="0 0 860 470"
+        className="w-full h-auto font-sans"
+        role="img"
+        aria-labelledby="arch-title arch-desc"
+      >
+        <title id="arch-title">Blaze Cache architecture</title>
+        <desc id="arch-desc">
+          Five adapters and createCache() feed the TypeScript API, which crosses into the
+          Rust engine over wasm-bindgen. The engine holds the slab allocator, SIEVE queue,
+          TTL fast-path, tag index and debounced persistence.
+        </desc>
+        <style>{ARCH_CSS}</style>
 
-      {/* Top Layer - Browser */}
-      <section className="relative z-10 rounded-2xl border border-border bg-card/80 p-6 shadow-lg backdrop-blur mb-8">
-        <div className="absolute -top-2 left-6 rounded-full bg-gradient-to-r from-amber-600 to-flame px-3 py-0.5 text-[10px] font-bold uppercase text-white shadow-md tracking-widest">Layer 1 — Browser</div>
-        <div className="flex items-center gap-4 mt-2">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 to-amber-600/20 shadow-inner shadow-[#d97706]/10">
-            <Globe size={28} className="text-flame" />
-          </div>
-          <div>
-            <h5 className="text-xl font-bold text-foreground tracking-tight">TypeScript Layer</h5>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {["Axios Adapter", "React Query v5", "createCache()"].map((b) => (
-                <span key={b} className="rounded-md bg-secondary border border-border px-2.5 py-1 text-xs font-medium text-foreground shadow-sm">{b}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+        <defs>
+          <marker
+            id="arch-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M0 1 L9 5 L0 9 z" fill="var(--color-flame)" />
+          </marker>
+        </defs>
 
-      {/* Connector */}
-      <div className="flex justify-center mb-8">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-b from-amber-600/40 to-flame/40 shadow-[0_0_15px_rgba(217,119,6,0.4)] flex items-center justify-center animate-pulse">
-            <ArrowDown size={18} className="text-foreground" />
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-flame">Wasm Bridge</span>
-        </div>
-      </div>
-
-      {/* Middle - Wasm */}
-      <section className="relative rounded-2xl border border-border bg-gradient-to-br from-card to-background p-6 shadow-lg mb-8">
-        <div className="absolute -top-2 left-6 rounded-full bg-gradient-to-r from-flame to-primary px-3 py-0.5 text-[10px] font-bold uppercase text-white tracking-widest shadow-md">Layer 2 — Wasm</div>
-        <div className="flex items-center gap-4 mt-2">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-flame/20 to-primary/30 shadow-inner shadow-[#f472b6]/10">
-            <Link2 size={28} className="text-amber-600" />
-          </div>
-          <div>
-            <h5 className="text-xl font-bold text-foreground tracking-tight">Wasm Bindings</h5>
-            <p className="text-xs text-muted-foreground mt-1">wasm-bindgen • synchronous hot path • one-time init</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Connector */}
-      <div className="flex justify-center mb-8">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-b from-flame/40 to-primary/40 shadow-[0_0_15px_rgba(244,114,182,0.4)] flex items-center justify-center animate-pulse">
-            <ArrowDown size={18} className="text-foreground" />
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-flame">Rust Core</span>
-        </div>
-      </div>
-
-      {/* Bottom - Rust Engine */}
-      <section className="relative rounded-3xl border border-border bg-card/60 p-6 md:p-8 shadow-2xl shadow-[#8a1e2e]/10">
-        <h5 className="text-lg font-bold text-foreground tracking-tight mb-6">Rust Engine — blaze-cache-core</h5>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[
-            { icon: Box, title: "Slab Allocator", detail: "Vec<Option<Node>> + free list • O(1)" },
-            { icon: Link2, title: "SIEVE Queue", detail: "Doubly linked • scan-resistant" },
-            { icon: Clock, title: "TTL Fast-path", detail: "ttl_count • skips now() when zero" },
-            { icon: Tag, title: "Tags", detail: "Monotonic IDs • set diff" },
-            { icon: Database, title: "Persistence", detail: "IndexedDB • debounced • pagehide" },
-          ].map(({ icon: Icon, title, detail }) => (
-            <div key={title} className="rounded-2xl border border-border bg-background/80 p-4 shadow-md hover:shadow-[0_0_20px_rgba(217,119,6,0.15)] transition-all hover:-translate-y-0.5 group">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-amber-600/20 shadow-inner shadow-[#8a1e2e]/10 mb-3 group-hover:scale-110 transition-transform">
-                <Icon size={20} className="text-flame" />
-              </div>
-              <h6 className="text-sm font-bold text-foreground leading-tight">{title}</h6>
-              <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{detail}</p>
-            </div>
+        {/* Adapters → bus */}
+        <g
+          fill="var(--color-secondary)"
+          stroke="var(--color-border)"
+          strokeWidth="1"
+        >
+          {ADAPTERS.map((a) => (
+            <rect key={a.label} x={a.cx - 70} y={28} width={140} height={34} rx={6} />
           ))}
-        </div>
-      </section>
+        </g>
+        <g
+          fill="var(--color-foreground)"
+          fontSize="13"
+          fontWeight="600"
+          textAnchor="middle"
+        >
+          {ADAPTERS.map((a) => (
+            <text key={a.label} x={a.cx} y={50}>
+              {a.label}
+            </text>
+          ))}
+        </g>
 
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-card/60 px-6 py-3 text-xs font-medium text-muted-foreground border border-border shadow-inner">
-        <span className="rounded-md bg-gradient-to-r from-amber-600 to-flame px-2 py-0.5 text-[10px] font-bold text-white">SYSTEM</span>
-        <span>No threads • No async • No I/O • Browser only • ESM</span>
-      </div>
+        <path
+          className="arch-flow"
+          d="M120 62 V96 M275 62 V96 M430 62 V96 M585 62 V96 M740 62 V96 M120 96 H740 M430 96 V120"
+          fill="none"
+          stroke="var(--color-stroke)"
+          strokeWidth="1.5"
+        />
+
+        {/* TypeScript API */}
+        <rect
+          x={250}
+          y={120}
+          width={360}
+          height={64}
+          rx={8}
+          fill="var(--color-background)"
+          stroke="var(--color-flame)"
+          strokeWidth="1.5"
+        />
+        <text
+          x={430}
+          y={149}
+          fill="var(--color-foreground)"
+          fontSize="16"
+          fontWeight="700"
+          textAnchor="middle"
+        >
+          TypeScript API
+        </text>
+        <text
+          x={430}
+          y={171}
+          fill="var(--color-muted-foreground)"
+          fontSize="11.5"
+          textAnchor="middle"
+        >
+          createCache() · synchronous get/set · typed events
+        </text>
+
+        {/* Wasm bridge */}
+        <path
+          d="M430 184 V244"
+          fill="none"
+          stroke="var(--color-stroke)"
+          strokeWidth="1.5"
+          markerEnd="url(#arch-arrow)"
+        />
+        <path
+          className="arch-comet"
+          pathLength={100}
+          d="M430 184 V244"
+          fill="none"
+          stroke="var(--color-flame)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+        <circle className="arch-pulse" cx={446} cy={210} r={4} fill="var(--color-flame)" />
+        <text x={460} y={207} fill="var(--color-foreground)" fontSize="11.5" fontWeight="700">
+          wasm-bindgen
+        </text>
+        <text x={460} y={223} fill="var(--color-muted-foreground)" fontSize="10.5">
+          one crossing · sync hot path
+        </text>
+
+        {/* Rust engine */}
+        <rect
+          x={50}
+          y={250}
+          width={760}
+          height={140}
+          rx={8}
+          fill="var(--color-card)"
+          stroke="var(--color-border)"
+          strokeWidth="1"
+        />
+        <text x={74} y={280} fill="var(--color-foreground)" fontSize="14" fontWeight="700">
+          Rust engine · blaze-cache-core
+        </text>
+        <text
+          x={786}
+          y={280}
+          fill="var(--color-flame)"
+          fontSize="11"
+          fontWeight="600"
+          textAnchor="end"
+        >
+          no threads · no async · no I/O
+        </text>
+
+        {SUBSYSTEMS.map((s, i) => {
+          const x = 70 + i * 147
+          return (
+            <g key={s.title}>
+              <rect
+                x={x}
+                y={294}
+                width={132}
+                height={74}
+                rx={6}
+                fill="var(--color-background)"
+                stroke="var(--color-border)"
+                strokeWidth="1"
+              />
+              <text
+                x={x + 66}
+                y={326}
+                fill="var(--color-foreground)"
+                fontSize="12.5"
+                fontWeight="700"
+                textAnchor="middle"
+              >
+                {s.title}
+              </text>
+              <text
+                x={x + 66}
+                y={347}
+                fill="var(--color-muted-foreground)"
+                fontSize="10"
+                textAnchor="middle"
+              >
+                {s.detail}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* System strip */}
+        <rect
+          x={210}
+          y={416}
+          width={440}
+          height={36}
+          rx={8}
+          fill="var(--color-secondary)"
+          stroke="var(--color-border)"
+          strokeWidth="1"
+        />
+        <text
+          x={430}
+          y={439}
+          fill="var(--color-muted-foreground)"
+          fontSize="11.5"
+          fontWeight="600"
+          letterSpacing="0.06em"
+          textAnchor="middle"
+        >
+          BROWSER ONLY · ESM · WASM HOT PATH · O(1) EVICTION
+        </text>
+      </svg>
     </div>
   )
 }
