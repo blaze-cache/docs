@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Badge } from "./ui/badge"
 import { Separator } from "./ui/separator"
 import { Button } from "./ui/button"
-import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio } from "lucide-react"
+import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind } from "lucide-react"
 import ArchitectureDiagram from "./ArchitectureDiagram"
 import CopyButton from "./CopyButton"
 import ThemeToggle from "./ThemeToggle"
@@ -150,9 +150,9 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                 <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-secondary rounded-full" />
                 {navItems.map((n, idx) => {
                   const active = activeId === n.id;
-                  const group = n.id === "core" ? "Core" : n.id === "rq" || n.id === "swr" || n.id === "axios" || n.id === "fetch" ? "Adapters" : n.id === "usage" ? "Usage" : n.id === "repo" ? "Repo" : "";
+                  const group = n.id === "core" ? "Core" : n.id === "rq" || n.id === "swr" || n.id === "axios" || n.id === "fetch" || n.id === "ky" ? "Adapters" : n.id === "usage" ? "Usage" : n.id === "repo" ? "Repo" : "";
                   const prev = navItems[idx - 1];
-                  const prevGroup = prev ? (prev.id === "core" ? "Core" : prev.id === "rq" || prev.id === "swr" || prev.id === "axios" || prev.id === "fetch" ? "Adapters" : prev.id === "usage" ? "Usage" : prev.id === "repo" ? "Repo" : "") : "";
+                  const prevGroup = prev ? (prev.id === "core" ? "Core" : prev.id === "rq" || prev.id === "swr" || prev.id === "axios" || prev.id === "fetch" || prev.id === "ky" ? "Adapters" : prev.id === "usage" ? "Usage" : prev.id === "repo" ? "Repo" : "") : "";
                   return (
                     <>
                       {group && group !== prevGroup && (
@@ -498,6 +498,17 @@ offEvict();           // …or just this one handle (idempotent)`} />
                     variant to the wrong caller, and the response's <code>Age</code> shortens the
                     freshness window the adapter enforces on every read.
                   </p>
+                  <p className="mb-6 max-w-3xl text-muted-foreground">
+                    This cycle hardened the adapter further: a{" "}
+                    <strong className="text-foreground">stream response body</strong> is never
+                    stored (it would be consumed before it could be replayed),{" "}
+                    <code>URLSearchParams</code>, <code>FormData</code> and <code>Map</code> params
+                    key correctly, the <code>x-blaze-cache</code> marker is stripped from stored
+                    headers so a replayed response never carries two, a replayed 4xx error surfaces
+                    as axios's <code>ERR_BAD_REQUEST</code> instead of a generic one, and
+                    malformed <code>Cache-Control</code> directives are ignored rather than read
+                    as zero.
+                  </p>
                 </>
               )}
               <div className="grid grid-cols-1 gap-6">
@@ -619,6 +630,16 @@ const api = axios.create({
                     <code>GET</code> opens a single connection instead of N. A cache that throws costs
                     one console warning — never a failed response.
                   </p>
+                  {isBeta && (
+                    <p className="text-muted-foreground mb-6 max-w-3xl">
+                      This cycle closed four edge cases: status <code>101</code> never lands in
+                      the null-body set, an in-flight joiner honours its own{" "}
+                      <code>AbortSignal</code> instead of waiting for the leader, a caller's abort
+                      stays out of the background revalidate (a stale refresh keeps running for
+                      everyone else), and malformed <code>Cache-Control</code> directives are
+                      ignored rather than read as zero.
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-1 gap-6">
                     <Card className="border-border bg-card overflow-hidden">
@@ -706,6 +727,124 @@ cache.invalidateTags('fetch');`} />
                   </div>
                 </section>
 
+                <section id="ky" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Ky Adapter</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in beta</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    The <code className="text-flame">@blaze-cache/ky</code> package caches ky
+                    requests through two hooks: one answers from the cache by returning a real{" "}
+                    <code>Response</code> — ky skips the network entirely — and one stores the
+                    response worth keeping. Works on <strong className="text-foreground">ky v1
+                    and v2</strong>, whose hook signatures differ: the hooks recognise whichever
+                    shape they are called with, from one implementation.
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-6">
+                    <Card className="border-border bg-card overflow-hidden">
+                      <CardHeader className="border-b border-border">
+                        <code className="font-mono text-sm text-flame">blazeKyHook(cache, options) → hooks</code>
+                      </CardHeader>
+                      <CardContent className="pt-6 relative">
+                        <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`import ky from 'ky';
+import { blazeKyHook } from '@blaze-cache/ky';
+import { createCache } from '@blaze-cache/core';
+
+const cache = await createCache({ capacity: 1000 });
+
+const api = ky.extend({
+  hooks: {
+    ...blazeKyHook(cache, { ttlMs: 30_000, tags: (res, req) => ['api'] }),
+  },
+});
+
+const res = await api.get('https://api.example.com/users');
+res.headers.get('x-blaze-cache'); // 'MISS'
+
+const again = await api.get('https://api.example.com/users');
+again.headers.get('x-blaze-cache'); // 'HIT'`}</code></pre><CopyButton text={`import ky from 'ky';
+import { blazeKyHook } from '@blaze-cache/ky';
+import { createCache } from '@blaze-cache/core';
+
+const cache = await createCache({ capacity: 1000 });
+
+const api = ky.extend({
+  hooks: {
+    ...blazeKyHook(cache, { ttlMs: 30_000, tags: (res, req) => ['api'] }),
+  },
+});
+
+const res = await api.get('https://api.example.com/users');
+res.headers.get('x-blaze-cache'); // 'MISS'
+
+const again = await api.get('https://api.example.com/users');
+again.headers.get('x-blaze-cache'); // 'HIT'`} />
+                      </CardContent>
+                    </Card>
+                    <Card className="border-border bg-card overflow-hidden">
+                      <CardHeader className="border-b border-border">
+                        <code className="font-mono text-sm text-flame">createBlazeKy(cache, options) → ky instance</code>
+                      </CardHeader>
+                      <CardContent className="pt-6 relative">
+                        <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`import { createBlazeKy } from '@blaze-cache/ky';
+
+const api = createBlazeKy(cache, {
+  prefixUrl: 'https://api.example.com', // ky v1; ky v2 spells this baseUrl
+  ttlMs: 30_000,
+});
+
+const users = await api.get('users').json();`}</code></pre><CopyButton text={`import { createBlazeKy } from '@blaze-cache/ky';
+
+const api = createBlazeKy(cache, {
+  prefixUrl: 'https://api.example.com', // ky v1; ky v2 spells this baseUrl
+  ttlMs: 30_000,
+});
+
+const users = await api.get('users').json();`} />
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <p className="mt-6 text-muted-foreground max-w-3xl">
+                    Your own hooks keep working — <code>ky.extend</code> appends, so your{" "}
+                    <code>beforeRequest</code> hooks run before the cache (any header they set
+                    is folded into the key) and your <code>afterResponse</code> hooks run before
+                    the response is stored. A hit is a real <code>Response</code> — status,
+                    headers, body and redirect state replayed exactly — and never re-stores
+                    itself, so reads leave the entry's TTL where it was.
+                  </p>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "ttlMs", sig: "number | (response, request) => number", desc: "Freshness window in ms. Default 60_000; a response Cache-Control: max-age overrides it, minus its Age." },
+                      { name: "methods", sig: "string[]", desc: "Methods eligible for caching. Default ['GET'] — pass ['GET', 'HEAD'] to include HEAD. Anything else always hits the network." },
+                      { name: "cacheControl", sig: "boolean", desc: "Honour Cache-Control on both sides: request no-store / no-cache / max-age=0 skip the read, response max-age sets the TTL and no-store / no-cache stop it being stored. Malformed directives are ignored rather than read as zero. Default true." },
+                      { name: "key", sig: "(request) => string", desc: "Builds the cache key. Default is method + URL + a hash of varyHeaders; defaultCacheKey is exported if you want to build on it." },
+                      { name: "shouldCache", sig: "(response, request) => boolean", desc: "Decides what gets stored. Default: 2xx only. A cached non-2xx still throws ky's HTTPError on replay exactly like the network one." },
+                      { name: "tags", sig: "(response, request) => string[]", desc: "Tags on stored responses. Default ['ky', '<method> <url>'] — the same per-resource spelling fetch and axios use, so shared caches invalidate together." },
+                      { name: "varyHeaders", sig: "string[]", desc: "Request headers folded into the default key — and the whitelist the response's Vary is checked against: Vary: * is never stored, and one varying outside the list is left uncached. Default ['authorization']." },
+                      { name: "markerHeader", sig: "string | false", desc: "Header written as HIT / MISS. Default 'x-blaze-cache'; pass false to disable the marker." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {isBeta && (
+                    <p className="mt-6 text-muted-foreground max-w-3xl">
+                      New in this cycle alongside the package itself: status <code>101</code>{" "}
+                      never lands in the null-body set, and malformed{" "}
+                      <code>Cache-Control</code> directives are ignored rather than read as zero
+                      — the same parser <code>@blaze-cache/fetch</code> uses.
+                    </p>
+                  )}
+                </section>
+
                 <Separator className="my-16 bg-border" />
               </>
 
@@ -757,6 +896,15 @@ cache.invalidateTags('fetch');`} />
                     <code>initialData</code> is never overwritten, and the render-time read goes
                     through <code>peek()</code> so a StrictMode double render cannot move the hit rate.
                   </p>
+                  {isBeta && (
+                    <p className="mt-6 max-w-3xl text-muted-foreground">
+                      This cycle tightened the mirror's isolation: <code>removeQueries</code>{" "}
+                      and <code>clear</code> delete only mirror records — never a shared
+                      neighbour's entry — a refetch keeps the helper's tags and{" "}
+                      <code>ttl</code> instead of overwriting them, and non-infinite data is
+                      never seeded into the infinite mirror.
+                    </p>
+                  )}
                   <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
                     {[
                       { name: "Mirror persistence", desc: "Only explicit removeQueries / clear deletes the persisted copy — unobserved past gcTime still paints instantly." },
@@ -781,6 +929,13 @@ cache.invalidateTags('fetch');`} />
               <p className="text-muted-foreground mb-6 max-w-3xl">
                 The <code className="text-flame">@blaze-cache/swr</code> package gives SWR the same persistent backing that the other adapters get — a first render from the Blaze Cache, followed by a background revalidate that writes back with TTL and tags.
               </p>
+              {isBeta && (
+                <p className="text-muted-foreground mb-6 max-w-3xl">
+                  Per-call stamps win: a <code>ttlMs</code> or <code>tags</code> passed at the
+                  call site now beats the provider config instead of losing to it — the options
+                  you pass are the ones that stick.
+                </p>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>useBlazeSWR</CardTitle><CardDescription>Hook that paints instantly from Blaze Cache.</CardDescription></CardHeader>
@@ -891,7 +1046,7 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                     ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, flushes trigger on pagehide / visibilitychange, and a flush that fails re-queues its records instead of dropping them."
                     : "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and flushes trigger on pagehide / visibilitychange." },
                   { title: "Missing tag invalidation", desc: "Bulk removal by tag is rare in JS caches. Blaze Cache assigns monotonic tag IDs and performs invalidation via set difference — no full scan required." },
-                  { title: "Fragmented integrations", desc: isBeta ? "Axios, fetch() and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for all three, sharing the same persistence and stats model." : "Axios and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for both, sharing the same persistence and stats model." },
+                  { title: "Fragmented integrations", desc: isBeta ? "Axios, fetch(), ky and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model." : "Axios and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for both, sharing the same persistence and stats model." },
                   { title: "Bundler / asset complexity", desc: "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core; the package resolves it relative to its own URL." },
                 ].map((p) => (
                   <Card key={p.title} className="border-border bg-card/60">
