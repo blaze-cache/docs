@@ -63,7 +63,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
   useEffect(() => {
     document.title = RELEASES[releaseId].isBeta
       ? `Blaze Cache — ${RELEASES[releaseId].badge} (prerelease) documentation`
-      : "Blaze Cache — Rust / WebAssembly Client-Side Caching Library"
+      : "Blaze Cache — Full-Featured Client-Side Cache"
     // Switching versions rewrites the URL without a reload — keep deep links where they are.
     if (!window.location.hash) window.scrollTo({ top: 0 })
   }, [releaseId])
@@ -196,7 +196,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                 <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-[#6b1020]/20 blur-3xl" />
                 <div className="relative">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-flame mb-4">Blaze Cache</p>
-                  <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] bg-gradient-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6 max-w-4xl">A full-featured client-side caching library for heavy data, offline-first apps, and high-performance browsers — powered by Rust → WebAssembly.</h2>
+                  <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] bg-gradient-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6 max-w-4xl">A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly.</h2>
                   <p className="text-lg md:text-xl text-muted-foreground max-w-3xl leading-relaxed">It combines synchronous reads and writes, SIEVE eviction, tag-based invalidation, optional IndexedDB persistence, and first-class adapters for tools like Axios, fetch, TanStack Query, and SWR — giving you a complete caching layer for real-world frontend apps.</p>
                   <div className="mt-8 flex flex-wrap gap-3">
                     <Badge className="text-sm px-3 py-1">Wasm hot path</Badge>
@@ -1106,7 +1106,7 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                     <CardDescription>Public MIT-licensed monorepo at github.com/blaze-cache/blaze-cache</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm text-muted-foreground">
-                    <p><strong className="text-foreground">Description:</strong> Blazingly fast client-side caching library powered by Rust → WebAssembly.</p>
+                    <p><strong className="text-foreground">Description:</strong> A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly.</p>
                     <div className="flex flex-wrap gap-2">
                       <Badge>{release.badge}</Badge>
                       <Badge variant="outline">MIT</Badge>

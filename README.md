@@ -1,6 +1,6 @@
 # Blaze Cache — Documentation Site
 
-Modern documentation site for the Blaze Cache project, a Rust / WebAssembly client-side caching library.
+Modern documentation site for Blaze Cache, a full-featured client-side cache powered by Rust and WebAssembly.
 
 Built with:
 - React + TypeScript + Vite
