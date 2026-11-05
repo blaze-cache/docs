@@ -31,6 +31,7 @@ const KIND_CLS: Record<string, string> = {
   new: "border-primary text-flame",
   fixed: "border-emerald-600/60 text-emerald-700 dark:text-emerald-300",
   testing: "border-amber-600/60 text-amber-700 dark:text-amber-300",
+  perf: "border-violet-600/60 text-violet-700 dark:text-violet-300",
 }
 
 /** Commit URLs on the "What's New" cards — every claim links back to the diff that made it. */

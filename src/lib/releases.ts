@@ -83,7 +83,7 @@ packages/
 
 const COMMANDS_STABLE = ["pnpm install", "pnpm build", "pnpm build:wasm", "pnpm test", "pnpm lint", "pnpm dev", "pnpm clean"];
 
-// The published prerelease on npm is `0.3.0-beta.0`, but the docs label the
+// The published prerelease on npm is a `0.3.0-beta.x` version, but the docs label the
 // release `0.3.0-beta` (matching the 0.2.x-beta pattern) and install through
 // the `beta` dist-tag — a literal `@0.3.0-beta` would 404 on the registry.
 const BETA_RELEASE: Release = {
@@ -108,6 +108,10 @@ const BETA_RELEASE: Release = {
     "# optional: SWR config", "npm install swr",
   ],
   whatsNew: [
+    { kind: "fixed", title: "ky: the caller's MISS body stays readable", desc: "ky cancels the response an `afterResponse` hook replaces, and the MISS marker rebuild wrapped around that very body — on undici, where headers are immutable, the rebuilt response reached the caller holding an already-consumed stream (`Body is unusable`). The body is now buffered and the rebuild wraps the copy; the store tee was never affected.", href: "#ky", more: "Ky Adapter", commits: ["19346f6", "b8318e7"] },
+    { kind: "testing", title: "Live suites against the real GitHub API", desc: "The ky, react-query and swr adapters plus the shared integration package now ship opt-in live tests that run the cache against api.github.com — 28 network tests on top of the offline matrix, started with `pnpm test:live`. The CI live job lists every suite, and the script builds core's dist first so a fresh clone just works.", href: "#repo", more: "Repo & Development", commits: ["ee6b193", "cbe2ac0", "5699592", "28f17f6", "db6de4a", "e9bb985"] },
+    { kind: "perf", title: "TTL-free caches skip the clock in bulk reads too", desc: "`entries()`, `keys()`, `keysWithTag()` and `prune()` now share the fast path `get`/`set` already had: with no entry carrying a deadline, the monotonic clock — a `performance.now()` boundary crossing per call on wasm — is never touched. The drop log's soft cap also became a true `O(1)` `VecDeque` pop instead of a scan.", href: "#core", more: "Core API", commits: ["c00f8dd", "291cd37"] },
+    { kind: "fixed", title: "setMany clamps malformed tag offsets instead of trapping", desc: "The batch writer's tag offsets arrive from JS, and a non-monotonic or out-of-range pair used to panic mid-slice and trap the whole wasm instance. Bad offsets now degrade to 'no tags for this entry' — every entry is still stored and readable, only its tags are dropped, matching how short arrays were already tolerated.", href: "#core", more: "Core API", commits: ["4dacced"] },
     { kind: "fixed", title: "Persistence that survives a failed flush", desc: "Keys that repeatedly fail to flush are dropped instead of poisoning the queue — everything else stays pending; a malformed IndexedDB body aborts its own transaction; `dispose()` tears down exactly once; and `flushDelayMs` / `maxRecords` are validated at construction.", href: "#core", more: "Core API", commits: ["96db988", "ab3b1a0", "be22f0e", "55d4f6a", "c29f479"] },
     { kind: "fixed", title: "Events can no longer be disturbed mid-flight", desc: "A listener removed while an emit is running never fires, and a pending `once()` listener can be cancelled before it trips — subscriber churn can no longer change what the other listeners observe.", href: "#events", more: "Events", commits: ["c5864bd", "a894135"] },
     { kind: "fixed", title: "Axios adapter correctness", desc: "Stream response bodies are never stored; `URLSearchParams`, `FormData` and `Map` params key correctly; the HIT/MISS marker is stripped from stored headers; replayed 4xx errors surface as `ERR_BAD_REQUEST`; and malformed `Cache-Control` directives are ignored rather than thrown.", href: "#axios", more: "Axios Adapter", commits: ["c14f541", "10ee46c", "9534676", "3eb20c4", "00d025b", "376158e"] },
@@ -115,7 +119,7 @@ const BETA_RELEASE: Release = {
     { kind: "new", title: "New package: `@blaze-cache/ky`", desc: "The ky adapter joins the family — cache-backed requests for ky v1 and v2 with the same marker header, TTL and tag semantics, hardened in this cycle against `101` null-body responses and malformed `Cache-Control`.", href: "#ky", more: "Ky Adapter", commits: ["1fde5e7", "c1245bd", "075b095"] },
     { kind: "fixed", title: "React Query mirror stays isolated", desc: "Removal and purge touch only mirror records, helper tags and `ttl` survive a refetch, and non-infinite data is never seeded into the mirror.", href: "#rq", more: "React Query", commits: ["9163acb", "9680723", "3e2b830", "3a72825", "8b86546"] },
     { kind: "fixed", title: "SWR per-call stamps win", desc: "A per-call `ttlMs` / `tags` now beats the provider config instead of losing to it — the options you pass at the call site are the ones that stick.", href: "#swr", more: "SWR", commits: ["4a80fd2", "757cbb4"] },
-    { kind: "testing", title: "Twenty-five regression tests", desc: "Every fix above ships with a test: the offline matrix now runs 284 TypeScript tests across the six packages plus 45 Rust tests — all green, none touching the network.", href: "#repo", more: "Repo & Development", commits: ["c29f479", "376158e", "b459222", "075b095", "8b86546", "757cbb4"] },
+    { kind: "testing", title: "Twenty-five regression tests", desc: "Every fix above ships with a test: the offline matrix now runs 286 TypeScript tests across the workspace packages plus 64 Rust tests (43 engine, 4 doctests, 17 wasm bindings) — all green, none touching the network.", href: "#repo", more: "Repo & Development", commits: ["c29f479", "376158e", "b459222", "075b095", "8b86546", "757cbb4"] },
   ],
   nav: NAV_CURRENT,
   coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false }))],
