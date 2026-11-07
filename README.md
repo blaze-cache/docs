@@ -13,18 +13,22 @@ Built with:
 
 ## Features
 
-- Two routes: `/` documents the latest stable release, `/beta` the prerelease — package lists, install commands, nav and API tables all come from `src/lib/releases.ts`
+- Two routes: `/` documents the current stable release (0.3.0), `/0.2.5` the archived 0.2 line — package lists, install commands, nav and API tables all come from `src/lib/releases.ts`
 - Responsive documentation layout with sticky sidebar timeline navigation
 - Interactive scroll-tracking indicator (dots highlight active section)
 - Mobile drawer navigation
 - Copy-to-clipboard buttons on all code snippets
-- Sections: Overview, What's New (beta), Installation, Core API, Axios Adapter, Fetch Adapter (beta), Ky Adapter (beta), React Query, Usage, Architecture (animated SVG), Problems Solved, Repo & Development
+- Sections: Overview, What's New, Installation, Core API, Axios Adapter, Fetch Adapter, Ky Adapter, React Query, Usage, Architecture (animated SVG), Problems Solved, Repo & Development
 
 ## Updating a release
 
 `src/lib/releases.ts` is the single source of truth: bump `version`, `badge` and `installTag`,
 refresh `whatsNew` and `coreMethods`, and every label on the page follows — the header badge, the
-version switcher, the install cards, the document title and the What's New grid.
+version switcher, the install cards and the What's New grid.
+
+`RELEASES.stable` is the current release served at `/`; `RELEASES.legacy` is an archived line
+served at its own path (today `/0.2.5`) behind an `archive` banner. When a prerelease ships, add
+a beta entry and route alongside them.
 
 ## Development
 
