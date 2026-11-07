@@ -53,7 +53,8 @@ function VersionLink({ to, active, children }: { to: string; active: boolean; ch
 
 export default function DocsPage({ release: releaseId }: { release: ReleaseId }) {
   const release = RELEASES[releaseId]
-  const isBeta = release.isBeta
+  // Every release except the archived 0.2.5 docs renders the 0.3.0-line content.
+  const isCurrent = !release.legacy
   const navItems = release.nav
   const quickStart = release.quickStart.join("\n")
 
@@ -61,9 +62,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
   const [activeId, setActiveId] = useState("overview")
 
   useEffect(() => {
-    document.title = RELEASES[releaseId].isBeta
-      ? `Blaze Cache — ${RELEASES[releaseId].badge} (prerelease) documentation`
-      : "Blaze Cache — Full-Featured Client-Side Cache"
+    document.title = "Blaze Cache — Full-Featured Client-Side Cache"
     // Switching versions rewrites the URL without a reload — keep deep links where they are.
     if (!window.location.hash) window.scrollTo({ top: 0 })
   }, [releaseId])
@@ -92,13 +91,14 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
           <img src={Logo} alt="Blaze Cache" className="h-9 w-auto" />
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold tracking-tight leading-none">Blaze Cache</h1>
-            <Badge className={isBeta ? "border-transparent bg-amber-500 text-black hover:bg-amber-500" : undefined}>{release.badge}</Badge>
+            <Badge>{release.badge}</Badge>
           </div>
-          {/* Version switcher — stable tracks npm's `latest` tag, beta tracks `@beta`. Labels come
-              from the release record, so a version bump happens in exactly one place. */}
+          {/* Version switcher — stable tracks npm's `latest` tag, the archive keeps the 0.2
+              line readable. Labels come from the release record, so a version bump happens
+              in exactly one place. */}
           <nav aria-label="Documentation version" className="hidden items-center gap-1 rounded-lg border border-border bg-card p-0.5 px-3 lg:flex">
-            <VersionLink to="/" active={!isBeta}>{RELEASES.stable.badge}</VersionLink>
-            <VersionLink to="/beta" active={isBeta}>{RELEASES.beta.badge}</VersionLink>
+            <VersionLink to="/" active={isCurrent}>{RELEASES.stable.badge}</VersionLink>
+            <VersionLink to="/0.2.5" active={!isCurrent}>{RELEASES.legacy.badge}</VersionLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-primary hover:text-white" aria-label="Open menu"><Menu size={18} /></button>
@@ -130,8 +130,8 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
             <div className="mt-6 border-t border-border pt-5">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Docs version</p>
               <div className="flex flex-wrap gap-2 px-1">
-                <VersionLink to="/" active={!isBeta}>{RELEASES.stable.badge}</VersionLink>
-                <VersionLink to="/beta" active={isBeta}>{RELEASES.beta.badge}</VersionLink>
+                <VersionLink to="/" active={isCurrent}>{RELEASES.stable.badge}</VersionLink>
+                <VersionLink to="/0.2.5" active={!isCurrent}>{RELEASES.legacy.badge}</VersionLink>
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
@@ -176,16 +176,16 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
 
           <main className="min-w-0">
             {/* Which release these docs describe */}
-            {isBeta ? (
-              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4 text-sm text-amber-900 dark:text-amber-100">
-                <Badge className="border-transparent bg-amber-500 text-black hover:bg-amber-500">BETA</Badge>
-                <span>These docs describe the <strong>{release.badge}</strong> prerelease.</span>
-                <Link to="/" className="font-medium text-amber-700 dark:text-amber-300 underline underline-offset-4 hover:text-foreground">Latest stable is {RELEASES.stable.badge} →</Link>
-              </div>
-            ) : (
+            {isCurrent ? (
               <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
                 <Badge variant="outline">stable</Badge>
                 <span>Documenting release <strong>{release.badge}</strong>.</span>
+              </div>
+            ) : (
+              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
+                <Badge variant="outline">archive</Badge>
+                <span>These docs describe <strong>{release.badge}</strong>, an earlier release.</span>
+                <Link to="/" className="font-medium text-flame underline underline-offset-4 hover:text-foreground">Current docs are {RELEASES.stable.badge} →</Link>
               </div>
             )}
 
@@ -243,18 +243,8 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                     <Badge variant="outline" className="text-[11px]">{release.badge}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
-                    {isBeta ? (
-                      <>
-                        Everything <strong className="text-foreground">{release.badge}</strong> adds over
-                        the stable {RELEASES.stable.badge} — newest first, each card linking to the
-                        section that documents it.
-                      </>
-                    ) : (
-                      <>
-                        What shipped in <strong className="text-foreground">{release.badge}</strong> —
-                        newest first, each card linking to the section that documents it.
-                      </>
-                    )}
+                    What shipped in <strong className="text-foreground">{release.badge}</strong> —
+                    newest first, each card linking to the section that documents it.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {release.whatsNew.map((item) => (
@@ -300,7 +290,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Terminal size={20} /></div>
                 <h3 className="text-3xl font-bold font-mono tracking-tight">Installation</h3>
               </div>
-              <div className={`grid grid-cols-1 gap-6 ${isBeta ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+              <div className={`grid grid-cols-1 gap-6 ${isCurrent ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
                 {release.packages.map((i) => (
                   <Card key={i.pkg} className="border-border bg-card">
                     <CardHeader>
@@ -482,7 +472,7 @@ offEvict();           // …or just this one handle (idempotent)`} />
                 <code className="text-flame">@blaze-cache/axios</code> — pick the one that
                 matches how you create your instance.
               </p>
-              {isBeta && (
+              {isCurrent && (
                 <>
                   <p className="mb-6 max-w-3xl text-muted-foreground">
                     The adapter stores headers that describe the stored bytes:{" "}
@@ -585,18 +575,18 @@ const api = axios.create({
               </div>
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
                 {[
-                  { name: "cache", sig: "BlazeAxiosCacheLike", desc: isBeta
+                  { name: "cache", sig: "BlazeAxiosCacheLike", desc: isCurrent
                     ? "The cache backing the adapter — required. Anything with get/set fits; each record carries its own freshUntil deadline, and an optional delete() drops one the adapter finds expired."
                     : "The cache backing the adapter — required. Anything with get/set fits, so a real Blaze Cache in production or a stub in tests." },
-                  { name: "ttlMs", sig: "number | (response, config) => number", desc: isBeta
+                  { name: "ttlMs", sig: "number | (response, config) => number", desc: isCurrent
                     ? "Freshness window in ms. Default 60_000; a response Cache-Control: max-age overrides it, minus the response's Age. A value <= 0 means don't store."
                     : "Freshness window in ms. Default 60_000; a response Cache-Control: max-age overrides it. A value <= 0 means don't store." },
-                  { name: "key", sig: "(config) => string", desc: isBeta
+                  { name: "key", sig: "(config) => string", desc: isCurrent
                     ? "Builds the cache key from the final (post-interceptor) config — the URL axios will actually request, joined like buildFullPath and canonicalised. Default hashes method, URL, params and varyHeaders, keeping bearer tokens out of stored keys."
                     : "Builds the cache key from the final (post-interceptor) config. Default hashes method, URL, params and varyHeaders, keeping bearer tokens out of stored keys." },
                   { name: "shouldCache", sig: "(response, config) => boolean", desc: "Decides what gets stored. Default: GET answering 2xx without no-store / no-cache. Rejected responses still return — just marked MISS." },
                   { name: "tags", sig: "(response, config) => string[]", desc: "Tags attached to stored responses. Default ['axios', '<METHOD> <url>'] — drop them together with cache.invalidateTags()." },
-                  { name: "varyHeaders", sig: "string[]", desc: isBeta
+                  { name: "varyHeaders", sig: "string[]", desc: isCurrent
                     ? "Request headers hashed into the key — and the whitelist the response's Vary is checked against: Vary: * is never stored, and one varying on a header outside this list is left uncached. Default ['Authorization'] so a personalised response never crosses users. Values are hashed, never stored."
                     : "Request headers hashed into the key. Default ['Authorization'] so a personalised response never crosses users. Values are hashed, never stored." },
                   { name: "markerHeader", sig: "string | false", desc: "Response header written as HIT / MISS. Default 'x-blaze-cache'; pass false to turn the marker off." },
@@ -631,7 +621,7 @@ const api = axios.create({
                     <code>GET</code> opens a single connection instead of N. A cache that throws costs
                     one console warning — never a failed response.
                   </p>
-                  {isBeta && (
+                  {isCurrent && (
                     <p className="text-muted-foreground mb-6 max-w-3xl">
                       This cycle closed four edge cases: status <code>101</code> never lands in
                       the null-body set, an in-flight joiner honours its own{" "}
@@ -728,13 +718,13 @@ cache.invalidateTags('fetch');`} />
                   </div>
                 </section>
 
-                {isBeta && (
+                {isCurrent && (
                   <>
                 <section id="ky" className="mb-20 scroll-mt-28">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Ky Adapter</h3>
-                    {isBeta && <Badge className="text-xs px-2 py-0.5">New in beta</Badge>}
+                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     The <code className="text-flame">@blaze-cache/ky</code> package caches ky
@@ -838,7 +828,7 @@ const users = await api.get('users').json();`} />
                     ))}
                   </div>
 
-                  {isBeta && (
+                  {isCurrent && (
                     <p className="mt-6 text-muted-foreground max-w-3xl">
                       New in this cycle alongside the package itself: status <code>101</code>{" "}
                       never lands in the null-body set, and malformed{" "}
@@ -902,7 +892,7 @@ const users = await api.get('users').json();`} />
                     <code>initialData</code> is never overwritten, and the render-time read goes
                     through <code>peek()</code> so a StrictMode double render cannot move the hit rate.
                   </p>
-                  {isBeta && (
+                  {isCurrent && (
                     <p className="mt-6 max-w-3xl text-muted-foreground">
                       This cycle tightened the mirror's isolation: <code>removeQueries</code>{" "}
                       and <code>clear</code> delete only mirror records — never a shared
@@ -935,7 +925,7 @@ const users = await api.get('users').json();`} />
               <p className="text-muted-foreground mb-6 max-w-3xl">
                 The <code className="text-flame">@blaze-cache/swr</code> package gives SWR the same persistent backing that the other adapters get — a first render from the Blaze Cache, followed by a background revalidate that writes back with TTL and tags.
               </p>
-              {isBeta && (
+              {isCurrent && (
                 <p className="text-muted-foreground mb-6 max-w-3xl">
                   Per-call stamps win: a <code>ttlMs</code> or <code>tags</code> passed at the
                   call site now beats the provider config instead of losing to it — the options
@@ -994,19 +984,19 @@ cache.invalidateTags('user:42');" />
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle>Event Listeners</CardTitle>
-                    {isBeta && <CardDescription>Typed per event — or one wildcard listener for all ten.</CardDescription>}
+                    {isCurrent && <CardDescription>Typed per event — or one wildcard listener for all ten.</CardDescription>}
                   </CardHeader>
                   <CardContent className="relative">
-                    <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{isBeta ? `cache.on('evict', ({ key, value }) => console.log('dropped', key, value));
+                    <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{isCurrent ? `cache.on('evict', ({ key, value }) => console.log('dropped', key, value));
 cache.on((event) => console.log(event.type));   // wildcard — every event` : `const unsubscribe = cache.on((change) => {
   if (change.type === 'set') console.log('set:', change.key);
-});`}</code></pre><CopyButton text={isBeta ? `cache.on('evict', ({ key, value }) => console.log('dropped', key, value));
+});`}</code></pre><CopyButton text={isCurrent ? `cache.on('evict', ({ key, value }) => console.log('dropped', key, value));
 cache.on((event) => console.log(event.type));   // wildcard — every event` : `const unsubscribe = cache.on((change) => {
   if (change.type === 'set') console.log('set:', change.key);
 });`} />
                   </CardContent>
                 </Card>
-                {isBeta && (
+                {isCurrent && (
                   <Card className="border-border bg-card">
                     <CardHeader><CardTitle>Introspection without side effects</CardTitle><CardDescription>New in the 0.3 line — none of these records a hit or a miss.</CardDescription></CardHeader>
                     <CardContent className="relative">
@@ -1048,11 +1038,11 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 {[
                   { title: "Unpredictable JS eviction", desc: "LRU and WeakRef heuristics create object churn and non-deterministic cache hits. SIEVE offers a scan-resistant, O(1)-amortised algorithm with a tiny footprint." },
                   { title: "Async overhead on hot path", desc: "Standard caches return Promises for reads after initialization. Blaze Cache instantiates Wasm once during createCache(), so every get/set is fully synchronous." },
-                  { title: "No durable persistence", desc: isBeta
+                  { title: "No durable persistence", desc: isCurrent
                     ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, flushes trigger on pagehide / visibilitychange, and a flush that fails re-queues its records instead of dropping them."
                     : "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and flushes trigger on pagehide / visibilitychange." },
                   { title: "Missing tag invalidation", desc: "Bulk removal by tag is rare in JS caches. Blaze Cache assigns monotonic tag IDs and performs invalidation via set difference — no full scan required." },
-                  { title: "Fragmented integrations", desc: isBeta ? "Axios, fetch(), ky and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model." : "Axios and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for both, sharing the same persistence and stats model." },
+                  { title: "Fragmented integrations", desc: isCurrent ? "Axios, fetch(), ky and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model." : "Axios and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for both, sharing the same persistence and stats model." },
                   { title: "Bundler / asset complexity", desc: "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core; the package resolves it relative to its own URL." },
                 ].map((p) => (
                   <Card key={p.title} className="border-border bg-card/60">

@@ -8,7 +8,10 @@ import DocsPage from "./components/DocsPage"
 const basename = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"
 
 /**
- * `/` documents the latest stable release, `/beta` the prerelease.
+ * `/` documents the current stable release, `/0.2.5` the archived 0.2 line.
+ *
+ * `/beta` redirects home: the prerelease channel closed when 0.3.0 went stable, and
+ * deep links from before the promotion should land on current docs.
  *
  * `*` sends anything else back to the stable docs — including a deep link that GitHub
  * Pages resolved through `404.html`, which boots the SPA at an unknown path.
@@ -21,7 +24,8 @@ export default function App() {
     <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/" element={<DocsPage key="stable" release="stable" />} />
-        <Route path="/beta" element={<DocsPage key="beta" release="beta" />} />
+        <Route path="/0.2.5" element={<DocsPage key="legacy" release="legacy" />} />
+        <Route path="/beta" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

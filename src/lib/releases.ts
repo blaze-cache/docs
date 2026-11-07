@@ -1,19 +1,18 @@
-// @ts-nocheck
 /**
  * One entry per published release of the library.
  */
-export type ReleaseId = "stable" | "beta";
+export type ReleaseId = "stable" | "legacy";
 export interface NavItem { id: string; label: string; }
 export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
 export interface PackageCard { pkg: string; note: string; peers: string; }
 export interface WhatsNewItem { kind: string; title: string; desc: string; href: string; more: string; commits: string[]; }
 export interface Release {
-  id: ReleaseId; version: string; badge: string; isBeta: boolean; installTag: string;
+  id: ReleaseId; version: string; badge: string; legacy: boolean; installTag: string;
   packages: PackageCard[]; quickStart: string[]; whatsNew: WhatsNewItem[]; nav: NavItem[];
   coreMethods: MethodInfo[]; commands: string[]; layout: string;
 }
 
-/** Sidebar nav shared by both routes — every section the page renders is reachable. */
+/** Sidebar nav for the current release — every section the page renders is reachable. */
 const NAV_CURRENT: NavItem[] = [
   { id: "overview", label: "Overview" },
   { id: "whatsnew", label: "What's New" },
@@ -31,8 +30,8 @@ const NAV_CURRENT: NavItem[] = [
   { id: "repo", label: "Repo" },
 ];
 
-/** Stable nav excludes beta-only sections (e.g. the Ky adapter). */
-const NAV_STABLE: NavItem[] = NAV_CURRENT.filter((n) => n.id !== "ky");
+/** The archived 0.2.5 nav excludes sections that release never shipped (the Ky adapter). */
+const NAV_LEGACY: NavItem[] = NAV_CURRENT.filter((n) => n.id !== "ky");
 
 const CORE_METHODS: MethodInfo[] = [
   { name: "get", sig: "(key: string) => V | undefined", desc: "Value stored under key, or undefined when missing/expired. Counts as hit/miss." },
@@ -83,11 +82,10 @@ packages/
 
 const COMMANDS_STABLE = ["pnpm install", "pnpm build", "pnpm build:wasm", "pnpm test", "pnpm lint", "pnpm dev", "pnpm clean"];
 
-// The published prerelease on npm is a `0.3.0-beta.x` version, but the docs label the
-// release `0.3.0-beta` (matching the 0.2.x-beta pattern) and install through
-// the `beta` dist-tag — a literal `@0.3.0-beta` would 404 on the registry.
-const BETA_RELEASE: Release = {
-  id: "beta", version: "0.3.0-beta", badge: "v0.3.0-beta", isBeta: true, installTag: "@beta",
+// The current stable release: published on npm as 0.3.0 under the `latest` dist-tag, so
+// every install command below is untagged (`installTag` stays empty).
+const CURRENT_RELEASE: Release = {
+  id: "stable", version: "0.3.0", badge: "v0.3.0", legacy: false, installTag: "",
   packages: [
     { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
     { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
@@ -97,17 +95,18 @@ const BETA_RELEASE: Release = {
     { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
   ],
   quickStart: [
-    "# core is the only package you must install", "npm install @blaze-cache/core@beta", "",
+    "# core is the only package you must install", "npm install @blaze-cache/core", "",
     "# then only the integrations you use",
-    "npm install @blaze-cache/axios@beta",
-    "npm install @blaze-cache/fetch@beta",
-    "npm install @blaze-cache/ky@beta",
-    "npm install @blaze-cache/react-query@beta",
-    "npm install @blaze-cache/swr@beta", "",
+    "npm install @blaze-cache/axios",
+    "npm install @blaze-cache/fetch",
+    "npm install @blaze-cache/ky",
+    "npm install @blaze-cache/react-query",
+    "npm install @blaze-cache/swr", "",
     "# peers — only for the adapters above", "npm install axios", "npm install ky", "npm install @tanstack/react-query", "",
     "# optional: SWR config", "npm install swr",
   ],
   whatsNew: [
+    { kind: "perf", title: "The hot path stops paying for key encoding", desc: "Keys are pre-encoded into wasm memory once per distinct key and handed to the core by pointer, so a read no longer pays `passStringToWasm0`'s per-call malloc + copy + free; a delete hashes its key once instead of twice, an overwrite allocates no key at all, and the event bus short-circuits when nothing is subscribed. In the framework cache-store benchmark (50,000 × 1KB entries) warm reads dropped 21%, misses 54% and writes 26% — deletes improved 23% and now beat SWR.", href: "#core", more: "Core API", commits: ["bdbbd9f", "421aa1c", "7306899", "aff2b32"] },
     { kind: "fixed", title: "ky: the caller's MISS body stays readable", desc: "ky cancels the response an `afterResponse` hook replaces, and the MISS marker rebuild wrapped around that very body — on undici, where headers are immutable, the rebuilt response reached the caller holding an already-consumed stream (`Body is unusable`). The body is now buffered and the rebuild wraps the copy; the store tee was never affected.", href: "#ky", more: "Ky Adapter", commits: ["19346f6", "b8318e7"] },
     { kind: "testing", title: "Live suites against the real GitHub API", desc: "The ky, react-query and swr adapters plus the shared integration package now ship opt-in live tests that run the cache against api.github.com — 28 network tests on top of the offline matrix, started with `pnpm test:live`. The CI live job lists every suite, and the script builds core's dist first so a fresh clone just works.", href: "#repo", more: "Repo & Development", commits: ["ee6b193", "cbe2ac0", "5699592", "28f17f6", "db6de4a", "e9bb985"] },
     { kind: "perf", title: "TTL-free caches skip the clock in bulk reads too", desc: "`entries()`, `keys()`, `keysWithTag()` and `prune()` now share the fast path `get`/`set` already had: with no entry carrying a deadline, the monotonic clock — a `performance.now()` boundary crossing per call on wasm — is never touched. The drop log's soft cap also became a true `O(1)` `VecDeque` pop instead of a scan.", href: "#core", more: "Core API", commits: ["c00f8dd", "291cd37"] },
@@ -127,8 +126,9 @@ const BETA_RELEASE: Release = {
 };
 
 export const RELEASES: Record<ReleaseId, Release> = {
-  stable: {
-    id: "stable", version: "0.2.5", badge: "v0.2.5", isBeta: false, installTag: "",
+  stable: CURRENT_RELEASE,
+  legacy: {
+    id: "legacy", version: "0.2.5", badge: "v0.2.5", legacy: true, installTag: "",
     packages: [
       { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
       { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
@@ -154,9 +154,8 @@ export const RELEASES: Record<ReleaseId, Release> = {
       { kind: "fixed", title: "React Query mirror survives garbage collection", desc: "Only an explicit `removeQueries` or `clear` deletes the persisted copy — a query left unobserved past `gcTime` keeps its copy, so the next session still paints instantly. Custom `queryKeyHashFn` resolves on both sides, a caller-supplied `initialData` is never overwritten, and render-time reads use `peek()`.", href: "#rq", more: "React Query", commits: ["9a9f00030974d44e0001b1873a2ac53245e9d2d0"] },
       { kind: "testing", title: "Fifty regression tests", desc: "Every fix above ships with a test: 41 Rust unit tests plus 3 doctests, 12 wasm-binding tests and 119 offline TypeScript tests across the four packages — all green without touching the network.", href: "#repo", more: "Repo & Development", commits: ["63edca3c0ccd2d363139ef9659e8b0e73e8e6730"] },
     ],
-    nav: NAV_STABLE,
+    nav: NAV_LEGACY,
     coreMethods: [...CORE_METHODS, ...INTROSPECTION],
     commands: COMMANDS_STABLE, layout: LAYOUT,
   },
-  beta: BETA_RELEASE,
 };
