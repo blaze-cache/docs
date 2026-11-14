@@ -5,13 +5,14 @@ export type ReleaseId = "stable" | "legacy" | "beta";
 export interface NavItem { id: string; label: string; }
 export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
 export interface CommandInfo { cmd: string; note: string; }
+export interface ExampleInfo { dir: string; cmd: string; note: string; }
 export interface PackageCard { pkg: string; note: string; peers: string; }
 export interface WhatsNewItem { kind: string; title: string; desc: string; href: string; more: string; commits: string[]; }
 export interface Release {
   id: ReleaseId; version: string; badge: string; legacy: boolean; prerelease: boolean; installTag: string;
   metaDescription: string;
   packages: PackageCard[]; quickStart: string[]; whatsNew: WhatsNewItem[]; nav: NavItem[];
-  coreMethods: MethodInfo[]; commands: CommandInfo[]; layout: string;
+  coreMethods: MethodInfo[]; commands: CommandInfo[]; examples: ExampleInfo[]; layout: string;
 }
 
 /** Sidebar nav for the current release — every section the page renders is reachable. */
@@ -29,6 +30,7 @@ const NAV_CURRENT: NavItem[] = [
   { id: "architecture", label: "Architecture" },
   { id: "problems", label: "Problems Solved" },
   { id: "philosophy", label: "Philosophy" },
+  { id: "examples", label: "Examples" },
   { id: "repo", label: "Repo" },
 ];
 
@@ -164,6 +166,21 @@ const COMMANDS_LEGACY: CommandInfo[] = [
   { cmd: "pnpm clean", note: "remove build outputs" },
 ];
 
+/** One runnable Vite playground per adapter package — build once, then serve it. */
+const EXAMPLES_CURRENT: ExampleInfo[] = [
+  { dir: "examples/core", cmd: "pnpm dev:core", note: "Playground for @blaze-cache/core — set, get, tags, TTLs, events and IndexedDB persistence" },
+  { dir: "examples/axios", cmd: "pnpm dev:axios", note: "axios responses cached by a WebAssembly cache" },
+  { dir: "examples/fetch", cmd: "pnpm dev:fetch", note: "A drop-in fetch() backed by the cache" },
+  { dir: "examples/ky", cmd: "pnpm dev:ky", note: "ky hooks backed by the cache" },
+  { dir: "examples/react-query", cmd: "pnpm dev:react-query", note: "TanStack Query v5 mirrored into the cache" },
+  { dir: "examples/swr", cmd: "pnpm dev:swr", note: "SWR seeded from and persisted into the cache" },
+];
+
+/** The 0.2 line shipped a single example app. */
+const EXAMPLES_LEGACY: ExampleInfo[] = [
+  { dir: "examples/browser", cmd: "pnpm dev", note: "The one browser example the 0.2 line shipped with" },
+];
+
 // The current stable release: published on npm as 0.3.0 under the `latest` dist-tag, so
 // every install command below is untagged (`installTag` stays empty).
 const CURRENT_RELEASE: Release = {
@@ -205,7 +222,7 @@ const CURRENT_RELEASE: Release = {
   ],
   nav: NAV_CURRENT,
   coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false }))],
-  commands: COMMANDS_CURRENT, layout: LAYOUT,
+  commands: COMMANDS_CURRENT, examples: EXAMPLES_CURRENT, layout: LAYOUT,
 };
 
 // The 0.4.0-beta prerelease: published on npm under the `beta` dist-tag, so every install
@@ -249,7 +266,7 @@ const BETA_RELEASE: Release = {
   ],
   nav: NAV_BETA,
   coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS],
-  commands: COMMANDS_CURRENT, layout: LAYOUT_BETA,
+  commands: COMMANDS_CURRENT, examples: EXAMPLES_CURRENT, layout: LAYOUT_BETA,
 };
 
 export const RELEASES: Record<ReleaseId, Release> = {
@@ -285,6 +302,6 @@ export const RELEASES: Record<ReleaseId, Release> = {
     ],
     nav: NAV_LEGACY,
     coreMethods: [...CORE_METHODS, ...INTROSPECTION],
-    commands: COMMANDS_LEGACY, layout: LAYOUT_LEGACY,
+    commands: COMMANDS_LEGACY, examples: EXAMPLES_LEGACY, layout: LAYOUT_LEGACY,
   },
 };

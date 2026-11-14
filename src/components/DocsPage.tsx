@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Badge } from "./ui/badge"
 import { Separator } from "./ui/separator"
 import { Button } from "./ui/button"
-import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind } from "lucide-react"
+import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind, PlayCircle, ExternalLink } from "lucide-react"
 import ArchitectureDiagram from "./ArchitectureDiagram"
 import CopyButton from "./CopyButton"
 import ThemeToggle from "./ThemeToggle"
@@ -56,7 +56,7 @@ function navGroup(id: string): string {
   if (id === "core" || id === "persistence" || id === "wasm") return "Core"
   if (id === "rq" || id === "swr" || id === "axios" || id === "fetch" || id === "ky" || id === "ofetch") return "Adapters"
   if (id === "usage") return "Usage"
-  if (id === "repo") return "Repo"
+  if (id === "examples" || id === "repo") return "Repo"
   return ""
 }
 
@@ -1626,6 +1626,43 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                     ? "Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload or to all events at once — and subscribe()/subscribeMany()/subscribeTag() hand you the value itself, not just the change. Nothing blocks mutations."
                     : "Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload, or to all events at once — and they never block mutations."}</p></CardContent>
                 </Card>
+              </div>
+            </section>
+
+            <Separator className="my-16 bg-border" />
+
+            {/* Examples */}
+            <section id="examples" className="mb-20 scroll-mt-28">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><PlayCircle size={20} /></div>
+                <h3 className="text-3xl font-bold font-mono tracking-tight">Examples</h3>
+              </div>
+              <p className="mb-6 max-w-3xl text-muted-foreground">
+                {isCurrent
+                  ? "Every adapter has a runnable playground in the repo — a Vite + React app wired to the real cache, not a snippet. Each dev script builds the workspace first, then serves the example."
+                  : "The archived 0.2 line shipped a single browser example. Build the workspace, then serve it."}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {release.examples.map(({ dir, cmd, note }) => (
+                  <Card key={dir} className="border-border bg-card/60 flex flex-col">
+                    <CardHeader>
+                      <CardTitle className="font-mono text-base">{dir.replace("examples/", "")}</CardTitle>
+                      <CardDescription>{note}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="relative mt-auto">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 pr-16 text-sm font-mono leading-7 border border-border text-foreground"><code>{cmd}</code></pre>
+                      <CopyButton text={cmd} />
+                      <a
+                        href={`https://github.com/blaze-cache/blaze-cache/tree/main/${dir}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-flame hover:underline"
+                      >
+                        View source <ExternalLink size={12} />
+                      </a>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </section>
 
