@@ -4,13 +4,14 @@
 export type ReleaseId = "stable" | "legacy" | "beta";
 export interface NavItem { id: string; label: string; }
 export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
+export interface CommandInfo { cmd: string; note: string; }
 export interface PackageCard { pkg: string; note: string; peers: string; }
 export interface WhatsNewItem { kind: string; title: string; desc: string; href: string; more: string; commits: string[]; }
 export interface Release {
   id: ReleaseId; version: string; badge: string; legacy: boolean; prerelease: boolean; installTag: string;
   metaDescription: string;
   packages: PackageCard[]; quickStart: string[]; whatsNew: WhatsNewItem[]; nav: NavItem[];
-  coreMethods: MethodInfo[]; commands: string[]; layout: string;
+  coreMethods: MethodInfo[]; commands: CommandInfo[]; layout: string;
 }
 
 /** Sidebar nav for the current release — every section the page renders is reachable. */
@@ -91,31 +92,77 @@ const SUBSCRIPTIONS: MethodInfo[] = [
   { name: "subscribeTag", sig: "(tag, listener, options?) => () => void", desc: "Fires when any entry carrying the tag changes — delete, evict, expire, invalidate, prune and clear are attributed through a per-tag mirror.", isNew: true },
 ];
 
-const LAYOUT = `crates/
+/** The archived 0.2.5 line — the layout it actually shipped with (no ky yet). */
+const LAYOUT_LEGACY = `crates/
   blaze-cache-core/
   blaze-cache-wasm/
 packages/
   core/
   axios/
   fetch/
-  ky/
   react-query/
-  swr/`;
+  swr/
+  integration-tests/
+examples/
+  browser/`;
+
+/** Annotated layout of the current monorepo. */
+const LAYOUT = `crates/
+  blaze-cache-core/    Rust engine: slab store, SIEVE queue, tags, TTL, stats
+  blaze-cache-wasm/    wasm-bindgen bindings
+packages/
+  core/                @blaze-cache/core  (wasm loader, persistence, createCache)
+  axios/               @blaze-cache/axios (HTTP adapter)
+  fetch/               @blaze-cache/fetch (drop-in fetch() replacement)
+  ky/                  @blaze-cache/ky (ky.extend hook, ky v1 + v2)
+  react-query/         @blaze-cache/react-query (v5 mirror + hook)
+  swr/                 @blaze-cache/swr (SWR persist + hook)
+  integration-tests/   several packages sharing one cache
+examples/              one Vite playground per package
+benchmarks/cache/      pnpm bench — adapters vs React Query and SWR
+.github/               rust.yml · js.yml (offline + nightly live) · security.yml`;
 
 /** The beta layout adds the ofetch adapter package. */
 const LAYOUT_BETA = `crates/
-  blaze-cache-core/
-  blaze-cache-wasm/
+  blaze-cache-core/    Rust engine: slab store, SIEVE queue, tags, TTL, stats
+  blaze-cache-wasm/    wasm-bindgen bindings
 packages/
-  core/
-  axios/
-  fetch/
-  ky/
-  ofetch/
-  react-query/
-  swr/`;
+  core/                @blaze-cache/core  (wasm loader, persistence, createCache)
+  axios/               @blaze-cache/axios (HTTP adapter)
+  fetch/               @blaze-cache/fetch (drop-in fetch() replacement)
+  ky/                  @blaze-cache/ky (ky.extend hook, ky v1 + v2)
+  ofetch/              @blaze-cache/ofetch (ofetch / $fetch adapter)
+  react-query/         @blaze-cache/react-query (v5 mirror + hook)
+  swr/                 @blaze-cache/swr (SWR persist + hook)
+  integration-tests/   several packages sharing one cache
+examples/              one Vite playground per package
+benchmarks/cache/      pnpm bench — adapters vs React Query and SWR
+.github/               rust.yml · js.yml (offline + nightly live) · security.yml`;
 
-const COMMANDS_STABLE = ["pnpm install", "pnpm build", "pnpm build:wasm", "pnpm test", "pnpm lint", "pnpm dev", "pnpm clean"];
+/** Repo commands, with what each one runs — the current workspace's scripts. */
+const COMMANDS_CURRENT: CommandInfo[] = [
+  { cmd: "pnpm install", note: "workspace dependencies" },
+  { cmd: "pnpm build", note: "wasm + every package, topological" },
+  { cmd: "pnpm build:wasm", note: "wasm-pack only" },
+  { cmd: "pnpm typecheck", note: "every package, against workspace sources" },
+  { cmd: "pnpm test", note: "cargo test --workspace" },
+  { cmd: "pnpm test:js", note: "every package suite, against the built dist/" },
+  { cmd: "pnpm test:live", note: "opt-in live suites against real public APIs" },
+  { cmd: "pnpm bench", note: "adapters vs React Query and SWR" },
+  { cmd: "pnpm lint", note: "clippy -D warnings + rustfmt + tsc --noEmit" },
+  { cmd: "pnpm clean", note: "remove build outputs" },
+];
+
+/** The 0.2 line's command set, as that release shipped it. */
+const COMMANDS_LEGACY: CommandInfo[] = [
+  { cmd: "pnpm install", note: "workspace dependencies" },
+  { cmd: "pnpm build", note: "wasm + every package, topological" },
+  { cmd: "pnpm build:wasm", note: "wasm-pack only" },
+  { cmd: "pnpm test", note: "cargo test --workspace" },
+  { cmd: "pnpm lint", note: "clippy + rustfmt + tsc" },
+  { cmd: "pnpm dev", note: "build, then serve the example" },
+  { cmd: "pnpm clean", note: "remove build outputs" },
+];
 
 // The current stable release: published on npm as 0.3.0 under the `latest` dist-tag, so
 // every install command below is untagged (`installTag` stays empty).
@@ -158,7 +205,7 @@ const CURRENT_RELEASE: Release = {
   ],
   nav: NAV_CURRENT,
   coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false }))],
-  commands: COMMANDS_STABLE, layout: LAYOUT,
+  commands: COMMANDS_CURRENT, layout: LAYOUT,
 };
 
 // The 0.4.0-beta prerelease: published on npm under the `beta` dist-tag, so every install
@@ -202,7 +249,7 @@ const BETA_RELEASE: Release = {
   ],
   nav: NAV_BETA,
   coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS],
-  commands: COMMANDS_STABLE, layout: LAYOUT_BETA,
+  commands: COMMANDS_CURRENT, layout: LAYOUT_BETA,
 };
 
 export const RELEASES: Record<ReleaseId, Release> = {
@@ -238,6 +285,6 @@ export const RELEASES: Record<ReleaseId, Release> = {
     ],
     nav: NAV_LEGACY,
     coreMethods: [...CORE_METHODS, ...INTROSPECTION],
-    commands: COMMANDS_STABLE, layout: LAYOUT,
+    commands: COMMANDS_LEGACY, layout: LAYOUT_LEGACY,
   },
 };

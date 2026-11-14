@@ -234,7 +234,7 @@ const users = await api('/users');`
             <button onClick={() => setMobileOpen(true)} className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-primary hover:text-white" aria-label="Open menu"><Menu size={18} /></button>
             {/* max-md:hidden, not hidden md:inline-flex: the shadcn base class sets
                 inline-flex, which Tailwind emits after .hidden — so `hidden` never wins. */}
-            <Button size="sm" variant="outline" className="max-md:hidden border-border bg-card text-foreground hover:bg-primary hover:text-white hover:border-primary"><a href="https://github.com/blaze-cache/blaze-cache" target="_blank" rel="noreferrer">GitHub <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-bold">1</span></a></Button>
+            <Button size="sm" variant="outline" className="max-md:hidden border-border bg-card text-foreground hover:bg-primary hover:text-white hover:border-primary"><a href="https://github.com/blaze-cache/blaze-cache" target="_blank" rel="noreferrer">GitHub <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-bold">3</span></a></Button>
             <Button size="sm" className="max-md:hidden bg-primary text-white hover:bg-[#a0283a] shadow-[0_0_20px_rgba(138,30,46,0.35)]" onClick={() => document.getElementById("install")?.scrollIntoView({ behavior: "smooth" })}>Get Started</Button>
             <ThemeToggle />
           </div>
@@ -1598,7 +1598,8 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                       <Badge variant="outline">ESM</Badge>
                       <Badge variant="outline">Browser</Badge>
                     </div>
-                    <p><strong className="text-foreground">Stars / Watch:</strong> 1 star, 0 watching, 0 forks (as of repo state).</p>
+                    <p><strong className="text-foreground">Stars / Watch / Forks:</strong> 3 stars, 1 watching, 1 fork, 0 open issues.</p>
+                    <p><strong className="text-foreground">Docs:</strong> this site, at blaze-cache.github.io/docs — three routes, one per release line.</p>
                     <a href="https://github.com/blaze-cache/blaze-cache" target="_blank" rel="noreferrer" className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-[#a0283a]">View on GitHub</a>
                   </CardContent>
                 </Card>
@@ -1610,14 +1611,33 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                   <CardContent>
                     <table className="w-full text-sm text-muted-foreground">
                       <tbody className="divide-y divide-border">
-                        {release.commands.map((cmd) => (
-                          <tr key={cmd}><td className="py-1.5 font-mono text-xs text-foreground">{cmd}</td></tr>
+                        {release.commands.map(({ cmd, note }) => (
+                          <tr key={cmd}>
+                            <td className="py-1.5 pr-4 font-mono text-xs text-foreground whitespace-nowrap">{cmd}</td>
+                            <td className="py-1.5 text-right text-xs">{note}</td>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
                   </CardContent>
                 </Card>
               </div>
+
+              <Card className="mt-6 border-border bg-card/60">
+                <CardHeader>
+                  <CardTitle>Continuous integration</CardTitle>
+                  <CardDescription>Three workflows gate every push — offline first, live on a schedule.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  {[
+                    { wf: "rust.yml", desc: "cargo fmt, clippy -D warnings and the full test workspace on every push and PR." },
+                    { wf: "js.yml", desc: "The offline suites gate every push and PR; the live suites against real public APIs run nightly and on demand, so a third-party outage can't fail an unrelated PR." },
+                    { wf: "security.yml", desc: "gitleaks over the full history, pnpm audit and cargo audit — binaries pinned by sha256, third-party actions by commit SHA, Dependabot re-pinning weekly." },
+                  ].map((w) => (
+                    <p key={w.wf}><code className="font-mono text-xs text-flame">{w.wf}</code> — {w.desc}</p>
+                  ))}
+                </CardContent>
+              </Card>
 
               <Card className="mt-6 border-border bg-card/60">
                 <CardHeader><CardTitle>Repository Layout</CardTitle></CardHeader>
