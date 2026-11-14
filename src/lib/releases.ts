@@ -1,13 +1,13 @@
 /**
  * One entry per published release of the library.
  */
-export type ReleaseId = "stable" | "legacy";
+export type ReleaseId = "stable" | "legacy" | "beta";
 export interface NavItem { id: string; label: string; }
 export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
 export interface PackageCard { pkg: string; note: string; peers: string; }
 export interface WhatsNewItem { kind: string; title: string; desc: string; href: string; more: string; commits: string[]; }
 export interface Release {
-  id: ReleaseId; version: string; badge: string; legacy: boolean; installTag: string;
+  id: ReleaseId; version: string; badge: string; legacy: boolean; prerelease: boolean; installTag: string;
   packages: PackageCard[]; quickStart: string[]; whatsNew: WhatsNewItem[]; nav: NavItem[];
   coreMethods: MethodInfo[]; commands: string[]; layout: string;
 }
@@ -32,6 +32,20 @@ const NAV_CURRENT: NavItem[] = [
 
 /** The archived 0.2.5 nav excludes sections that release never shipped (the Ky adapter). */
 const NAV_LEGACY: NavItem[] = NAV_CURRENT.filter((n) => n.id !== "ky");
+
+/**
+ * The 0.4.0-beta nav inserts the sections this prerelease adds — persistence and the wasm
+ * loading strategy after the core material, the ofetch adapter with the other adapters —
+ * and keeps every section the stable page renders, in the order the page emits them.
+ */
+const NAV_BETA: NavItem[] = [
+  ...NAV_CURRENT.slice(0, 4), // overview … core (events render beneath it)
+  { id: "persistence", label: "Persistence" },
+  { id: "wasm", label: "Wasm Loading" },
+  ...NAV_CURRENT.slice(4, 7), // axios, fetch, ky
+  { id: "ofetch", label: "Ofetch" },
+  ...NAV_CURRENT.slice(7), // react-query … repo
+];
 
 const CORE_METHODS: MethodInfo[] = [
   { name: "get", sig: "(key: string) => V | undefined", desc: "Value stored under key, or undefined when missing/expired. Counts as hit/miss." },
@@ -69,6 +83,13 @@ const INTROSPECTION: MethodInfo[] = [
   { name: "off", sig: "(type?) | (listener?) => void", desc: "Removes listeners in bulk.", isNew: true },
 ];
 
+/** Value-oriented subscriptions added in the 0.4 line — present only in the beta release. */
+const SUBSCRIPTIONS: MethodInfo[] = [
+  { name: "subscribe", sig: "(key, listener, options?) => () => void", desc: "Calls back with the current value whenever key changes — set/touch give the value, removals give undefined. Returns an idempotent stop.", isNew: true },
+  { name: "subscribeMany", sig: "(keys, listener, options?) => () => void", desc: "One listener for several keys, told which one changed: (key, value, change). Duplicates collapse; an empty list attaches nothing.", isNew: true },
+  { name: "subscribeTag", sig: "(tag, listener, options?) => () => void", desc: "Fires when any entry carrying the tag changes — delete, evict, expire, invalidate, prune and clear are attributed through a per-tag mirror.", isNew: true },
+];
+
 const LAYOUT = `crates/
   blaze-cache-core/
   blaze-cache-wasm/
@@ -80,12 +101,25 @@ packages/
   react-query/
   swr/`;
 
+/** The beta layout adds the ofetch adapter package. */
+const LAYOUT_BETA = `crates/
+  blaze-cache-core/
+  blaze-cache-wasm/
+packages/
+  core/
+  axios/
+  fetch/
+  ky/
+  ofetch/
+  react-query/
+  swr/`;
+
 const COMMANDS_STABLE = ["pnpm install", "pnpm build", "pnpm build:wasm", "pnpm test", "pnpm lint", "pnpm dev", "pnpm clean"];
 
 // The current stable release: published on npm as 0.3.0 under the `latest` dist-tag, so
 // every install command below is untagged (`installTag` stays empty).
 const CURRENT_RELEASE: Release = {
-  id: "stable", version: "0.3.0", badge: "v0.3.0", legacy: false, installTag: "",
+  id: "stable", version: "0.3.0", badge: "v0.3.0", legacy: false, prerelease: false, installTag: "",
   packages: [
     { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
     { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
@@ -125,10 +159,54 @@ const CURRENT_RELEASE: Release = {
   commands: COMMANDS_STABLE, layout: LAYOUT,
 };
 
+// The 0.4.0-beta prerelease: published on npm under the `beta` dist-tag, so every install
+// command below carries `@beta` — leaving the tag off installs the last stable release.
+const BETA_RELEASE: Release = {
+  id: "beta", version: "0.4.0-beta", badge: "v0.4.0-beta", legacy: false, prerelease: true, installTag: "@beta",
+  packages: [
+    { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
+    { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
+    { pkg: "@blaze-cache/fetch", note: "Drop-in fetch() with HTTP caching", peers: "None" },
+    { pkg: "@blaze-cache/ky", note: "ky HTTP adapter (ky v1 & v2)", peers: "ky >= 1.14 || 2" },
+    { pkg: "@blaze-cache/ofetch", note: "ofetch / $fetch HTTP adapter (Nuxt & Nitro)", peers: "ofetch >= 1.0" },
+    { pkg: "@blaze-cache/react-query", note: "TanStack Query v5 integration", peers: "@tanstack/react-query >= 5.0.0" },
+    { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
+  ],
+  quickStart: [
+    "# core is the only package you must install", "npm install @blaze-cache/core@beta", "",
+    "# then only the integrations you use",
+    "npm install @blaze-cache/axios@beta",
+    "npm install @blaze-cache/fetch@beta",
+    "npm install @blaze-cache/ky@beta",
+    "npm install @blaze-cache/ofetch@beta",
+    "npm install @blaze-cache/react-query@beta",
+    "npm install @blaze-cache/swr@beta", "",
+    "# peers — only for the adapters above", "npm install axios", "npm install ky", "npm install ofetch", "npm install @tanstack/react-query", "",
+    "# optional: SWR config", "npm install swr",
+  ],
+  whatsNew: [
+    { kind: "new", title: "Persistence, hardened: sessions, schema and a control API", desc: "`cache.persistence` is a full control surface now — `flush()`, `clear()`, `hydrate()`, `stats()` and `rotate()` — over an adapter that folds a rotatable session generation into the key space: rotation drops every queued write and every flush still in flight, so a late save can no longer repopulate the next login's rows. Rows carry a schema stamp — storage written by a newer schema resets the namespace loudly instead of being misread, a corrupt row costs exactly itself — the options gain `namespace`, `debounceMs`, `maxEntries`, `restoreExpired`, `writeMode`, `onError` and `onActivity` (the old spellings remain as aliases), and each flush reaches storage as one batched transaction on a single reused connection.", href: "#persistence", more: "Persistence", commits: ["994c4ae", "a77cb59", "c14740e"] },
+    { kind: "new", title: "Value subscriptions: `subscribe`, `subscribeMany`, `subscribeTag`", desc: "Hand a key, a list of keys or a tag to `subscribe` and get the current value back on every change — `hit` and `miss` never wake one. A tag subscription attributes `delete`, `evict`, `expire`, `invalidate`, `prune` and `clear` to the tags they actually hit through a per-tag mirror, `{ once: true }` fires once, a throwing subscriber is logged and skipped, and with no subscription alive the layer does not exist: the hot path is untouched.", href: "#events", more: "Events", commits: ["de3bfa6", "1f90404", "e6e2941"] },
+    { kind: "new", title: "New package: `@blaze-cache/ofetch`", desc: "The same cache for ofetch / `$fetch` — the HTTP client behind Nuxt and Nitro. `blazeOfetch(instance, cache, options)` wraps an instance you already have, `createBlazeOfetch(cache, options)` builds one with ofetch defaults and cache options in a single bag, and the wrapped instance keeps the full ofetch API: parsed data, `.raw()` with the `x-blaze-cache` marker, `.native`, and `.create()`.", href: "#ofetch", more: "Ofetch Adapter", commits: ["134fb68", "431fa62"] },
+    { kind: "new", title: "Wasm loading, standardized", desc: "`createCache` now takes one explicit source — `wasmUrl`, a precompiled `module`, or an `instantiate` loader (plus the low-level `wasm` passthrough) — instead of a single overloaded option. The default still resolves the shipped binary relative to the package, concurrent creates share one download and compile, two sources at once throw a `TypeError`, and every failure says what to try next: the HTTP status and URL, the fetch error kept on `cause`, or the compile failure.", href: "#wasm", more: "Wasm Loading", commits: ["faab6af", "2be828c", "41e6292"] },
+    { kind: "new", title: "Per-request controls on axios and fetch", desc: "Pass `blazeCache` on any axios request config or fetch init to override `enabled`, `ttlMs`, `tags`, `key`, `varyHeaders` and `forceRefresh` for that one call — `blazeCache: false` bypasses the cache entirely, `invalidateTags` purges after a mutation, and `invalidateCacheTags(cache, ...tags)` is the standalone helper. On fetch, `forceRefresh` (or `cache: 'reload'`) skips the read and rewrites the entry, so the next request is a HIT again.", href: "#axios", more: "Axios Adapter", commits: ["414af74", "462e5f7", "e9361ad"] },
+    { kind: "new", title: "SWR: `forceRefresh`, tag resolvers, scoped invalidation", desc: "A call-site `forceRefresh` skips the persisted seed but keeps the write — the next mount starts from it — `tags` accepts a resolver run at write time from the key and data, a cache that throws costs a console warning instead of a broken hook, and `invalidateBlazeSWR(cache, ...tags)` purges only this package's envelopes: a neighbour integration's entry wearing the same tag survives.", href: "#swr", more: "SWR", commits: ["ccd41c6", "9f72607", "7f30570", "67480c4"] },
+    { kind: "fixed", title: "Request bodies join the cache key", desc: "An opted-in non-GET with two different payloads to one URL used to share a single entry and replay the first response for the second. The default key now folds the body in across axios, ky, ofetch and fetch — objects serialize injectively, `URLSearchParams` keep their order, `FormData` parts are sorted — and a body no encoder can read leaves that request uncached rather than guessed at, unless an explicit `key` describes it.", href: "#axios", more: "Axios Adapter", commits: ["47366c4"] },
+    { kind: "fixed", title: "Tags survive a capacity sweep", desc: "A tagged write that forced an eviction could lose its own tags: the slot was reclaimed before the tag id was interned, and the reused slot wore none. Tag ids are now interned after the sweep, so a write evicting its way into a full cache keeps its tags — with a regression test that forces exactly that eviction.", href: "#core", more: "Core API", commits: ["ea683c2", "a343ace"] },
+    { kind: "fixed", title: "ofetch: `.create()` defaults and origins", desc: "Defaults passed to `ofetch.create()` now apply to both the request and the cache key — an instance's own `baseURL`, hidden in a closure, is learned from the first response instead of being invisible to the key — and two different origins can no longer share one cache entry.", href: "#ofetch", more: "Ofetch Adapter", commits: ["01bb1c5", "37cac43"] },
+    { kind: "testing", title: "Persistence tested against real IndexedDB", desc: "The new suite runs 25 tests through `fake-indexeddb` against the shipped adapter: hydrate restores valid records, expired ones stay down when `restoreExpired` is off, a corrupt row costs only itself, a rotation blocks a stale in-flight write, `flush`/`clear`/`hydrate` behave, and namespaces stay isolated. The wasm loader and the subscription layer gained their own suites too.", href: "#repo", more: "Repo & Development", commits: ["a77cb59", "2be828c", "1f90404"] },
+    { kind: "fixed", title: "Supply-chain gates", desc: "CI pins every third-party action to a commit SHA, verifies the wasm-pack tarball against a pinned sha256 before extracting it, and runs gitleaks, `pnpm audit` and `cargo audit` on push, PR and nightly — with Dependabot re-pinning the SHAs. `follow-redirects` is overridden to a patched range for CVE-2026-116689.", href: "#repo", more: "Repo & Development", commits: ["2518b33", "34c00c8"] },
+  ],
+  nav: NAV_BETA,
+  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS],
+  commands: COMMANDS_STABLE, layout: LAYOUT_BETA,
+};
+
 export const RELEASES: Record<ReleaseId, Release> = {
   stable: CURRENT_RELEASE,
+  beta: BETA_RELEASE,
   legacy: {
-    id: "legacy", version: "0.2.5", badge: "v0.2.5", legacy: true, installTag: "",
+    id: "legacy", version: "0.2.5", badge: "v0.2.5", legacy: true, prerelease: false, installTag: "",
     packages: [
       { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
       { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
