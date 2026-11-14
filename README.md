@@ -13,12 +13,12 @@ Built with:
 
 ## Features
 
-- Two routes: `/` documents the current stable release (0.3.0), `/0.2.5` the archived 0.2 line — package lists, install commands, nav and API tables all come from `src/lib/releases.ts`
+- Three routes: `/` documents the current stable release (0.3.0), `/beta` the 0.4.0-beta prerelease (installed with the `@beta` dist-tag), `/0.2.5` the archived 0.2 line — package lists, install commands, nav and API tables all come from `src/lib/releases.ts`
 - Responsive documentation layout with sticky sidebar timeline navigation
 - Interactive scroll-tracking indicator (dots highlight active section)
 - Mobile drawer navigation
 - Copy-to-clipboard buttons on all code snippets
-- Sections: Overview, What's New, Installation, Core API, Axios Adapter, Fetch Adapter, Ky Adapter, React Query, Usage, Architecture (animated SVG), Problems Solved, Repo & Development
+- Sections: Overview, What's New, Installation, Core API, Events (plus subscriptions on beta), Persistence and Wasm Loading (beta), Axios Adapter, Fetch Adapter, Ky Adapter, Ofetch Adapter (beta), React Query, SWR, Usage, Architecture (animated SVG), Problems Solved, Philosophy, Repo & Development
 
 ## Updating a release
 
@@ -27,8 +27,10 @@ refresh `whatsNew` and `coreMethods`, and every label on the page follows — th
 version switcher, the install cards and the What's New grid.
 
 `RELEASES.stable` is the current release served at `/`; `RELEASES.legacy` is an archived line
-served at its own path (today `/0.2.5`) behind an `archive` banner. When a prerelease ships, add
-a beta entry and route alongside them.
+served at its own path (today `/0.2.5`) behind an `archive` banner; `RELEASES.beta` is the
+prerelease served at `/beta` behind a `beta` banner, with `prerelease: true` gating the sections
+only it renders (persistence, wasm loading, ofetch, subscriptions) and `installTag: "@beta"`
+tagging its install commands.
 
 ## Development
 
