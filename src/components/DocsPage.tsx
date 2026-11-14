@@ -1516,7 +1516,15 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Flame size={20} /></div>
                 <h3 className="text-3xl font-bold font-mono tracking-tight">Architecture</h3>
               </div>
-              <ArchitectureDiagram />
+              <p className="mb-6 max-w-3xl text-muted-foreground">
+                One Rust engine behind every adapter — and everything around it is TypeScript.
+                Adapters feed a single <code>createCache()</code> API whose reads and writes
+                cross the wasm boundary once and stay synchronous; persistence is a debounced
+                TypeScript layer <em className="text-foreground not-italic font-medium">over</em>{" "}
+                IndexedDB, never inside the engine, which keeps no threads, no async and no
+                I/O.
+              </p>
+              <ArchitectureDiagram beta={isBeta} />
             </section>
 
             <Separator className="my-16 bg-border" />

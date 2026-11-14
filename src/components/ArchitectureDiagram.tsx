@@ -5,21 +5,31 @@
  * `prefers-reduced-motion`. Every colour comes from the theme tokens, so
  * the diagram tracks the light/dark toggle.
  */
-const ADAPTERS = [
-  { label: "Axios", cx: 120 },
-  { label: "Fetch", cx: 275 },
-  { label: "Ky", cx: 430 },
-  { label: "React Query", cx: 585 },
-  { label: "SWR", cx: 740 },
-]
 
+/** Adapter labels — the beta release adds ofetch to the family. */
+const adapterLabels = (beta: boolean): string[] =>
+  beta
+    ? ["Axios", "Fetch", "Ky", "Ofetch", "React Query", "SWR"]
+    : ["Axios", "Fetch", "Ky", "React Query", "SWR"];
+
+/**
+ * Centres for `n` adapter boxes (130 wide, 12 apart) laid out symmetrically around
+ * x=430 — the bridge's axis — so any adapter count stays centred on the diagram.
+ */
+const adapterCenters = (n: number): number[] => {
+  const width = 130
+  const gap = 12
+  const start = (860 - (n * width + (n - 1) * gap)) / 2
+  return Array.from({ length: n }, (_, i) => start + i * (width + gap) + width / 2)
+};
+
+/** The engine's subsystems — persistence is deliberately not one: it never enters the core. */
 const SUBSYSTEMS = [
   { title: "Slab", detail: "O(1) free list" },
   { title: "SIEVE", detail: "scan-resistant" },
   { title: "TTL", detail: "fast-path" },
   { title: "Tags", detail: "monotonic IDs" },
-  { title: "Persistence", detail: "debounced" },
-]
+];
 
 const ARCH_CSS = `
   .arch-flow { stroke-dasharray: 5 7; animation: arch-dash 0.8s linear infinite; }
@@ -33,7 +43,17 @@ const ARCH_CSS = `
   }
 `
 
-export default function ArchitectureDiagram() {
+export default function ArchitectureDiagram({ beta = false }: { beta?: boolean }) {
+  const centers = adapterCenters(adapterLabels(beta).length)
+  const adapters = adapterLabels(beta).map((label, i) => ({ label, cx: centers[i] }))
+  const first = centers[0]
+  const last = centers[centers.length - 1]
+  // The bus runs from the first adapter to at least the persistence drop, so both the
+  // API and the persistence sidecar hang off it for every adapter count.
+  const busEnd = Math.max(last, 730)
+  // Engine subsystem boxes (132 wide, 147 apart) centred inside the 760-wide engine rect.
+  const engineStart = 50 + (760 - (SUBSYSTEMS.length * 132 + (SUBSYSTEMS.length - 1) * 15)) / 2
+
   return (
     <div className="rounded-3xl border border-border bg-card p-6 md:p-10 overflow-hidden">
       <svg
@@ -44,9 +64,9 @@ export default function ArchitectureDiagram() {
       >
         <title id="arch-title">Blaze Cache architecture</title>
         <desc id="arch-desc">
-          Five adapters and createCache() feed the TypeScript API, which crosses into the
-          Rust engine over wasm-bindgen. The engine holds the slab allocator, SIEVE queue,
-          TTL fast-path, tag index and debounced persistence.
+          {`${adapters.length} adapters and createCache() feed the TypeScript API, which crosses into the
+          Rust engine over wasm-bindgen. The engine holds the slab allocator, SIEVE queue, TTL fast-path
+          and tag index; persistence is a debounced TypeScript layer over IndexedDB.`}
         </desc>
         <style>{ARCH_CSS}</style>
 
@@ -70,8 +90,8 @@ export default function ArchitectureDiagram() {
           stroke="var(--color-border)"
           strokeWidth="1"
         >
-          {ADAPTERS.map((a) => (
-            <rect key={a.label} x={a.cx - 70} y={28} width={140} height={34} rx={6} />
+          {adapters.map((a) => (
+            <rect key={a.label} x={a.cx - 65} y={28} width={130} height={34} rx={6} />
           ))}
         </g>
         <g
@@ -80,7 +100,7 @@ export default function ArchitectureDiagram() {
           fontWeight="600"
           textAnchor="middle"
         >
-          {ADAPTERS.map((a) => (
+          {adapters.map((a) => (
             <text key={a.label} x={a.cx} y={50}>
               {a.label}
             </text>
@@ -89,7 +109,7 @@ export default function ArchitectureDiagram() {
 
         <path
           className="arch-flow"
-          d="M120 62 V96 M275 62 V96 M430 62 V96 M585 62 V96 M740 62 V96 M120 96 H740 M430 96 V120"
+          d={`${adapters.map((a) => `M${a.cx} 62 V96`).join(" ")} M${first} 96 H${busEnd} M430 96 V120 M730 96 V120`}
           fill="none"
           stroke="var(--color-stroke)"
           strokeWidth="1.5"
@@ -123,7 +143,47 @@ export default function ArchitectureDiagram() {
           fontSize="11.5"
           textAnchor="middle"
         >
-          createCache() · synchronous get/set · typed events
+          {beta
+            ? "createCache() · synchronous get/set · typed events · subscribe()"
+            : "createCache() · synchronous get/set · typed events"}
+        </text>
+
+        {/* Persistence sidecar — TypeScript only, never inside the engine */}
+        <path
+          d="M614 152 H626"
+          fill="none"
+          stroke="var(--color-stroke)"
+          strokeWidth="1.5"
+          markerEnd="url(#arch-arrow)"
+        />
+        <rect
+          x={630}
+          y={120}
+          width={200}
+          height={64}
+          rx={8}
+          fill="var(--color-background)"
+          stroke="var(--color-border)"
+          strokeWidth="1.5"
+        />
+        <text
+          x={730}
+          y={147}
+          fill="var(--color-foreground)"
+          fontSize="14"
+          fontWeight="700"
+          textAnchor="middle"
+        >
+          Persistence
+        </text>
+        <text
+          x={730}
+          y={167}
+          fill="var(--color-muted-foreground)"
+          fontSize="11"
+          textAnchor="middle"
+        >
+          {beta ? "IndexedDB · debounce · rotate()" : "IndexedDB · debounced writes"}
         </text>
 
         {/* Wasm bridge */}
@@ -177,7 +237,7 @@ export default function ArchitectureDiagram() {
         </text>
 
         {SUBSYSTEMS.map((s, i) => {
-          const x = 70 + i * 147
+          const x = engineStart + i * 147
           return (
             <g key={s.title}>
               <rect
