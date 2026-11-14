@@ -1491,6 +1491,27 @@ cache.on((event) => console.log(event.type));   // wildcard — every event` : `
 });`} />
                   </CardContent>
                 </Card>
+                {isBeta && (
+                  <Card className="border-border bg-card">
+                    <CardHeader>
+                      <CardTitle>Value subscriptions</CardTitle>
+                      <CardDescription>New in {release.version} — the value-oriented front end of events.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`const stop = cache.subscribe('user:42', (user, change) => {
+  console.log(change.type, user);   // 'set' → new value, 'delete' → undefined
+});
+
+cache.set('user:42', { name: 'Ada' });
+stop();                             // idempotent — safe from inside a listener`}</code></pre><CopyButton text={`const stop = cache.subscribe('user:42', (user, change) => {
+  console.log(change.type, user);   // 'set' → new value, 'delete' → undefined
+});
+
+cache.set('user:42', { name: 'Ada' });
+stop();                             // idempotent — safe from inside a listener`} />
+                    </CardContent>
+                  </Card>
+                )}
                 {isCurrent && (
                   <Card className="border-border bg-card">
                     <CardHeader><CardTitle>Introspection without side effects</CardTitle><CardDescription>New in the 0.3 line — none of these records a hit or a miss.</CardDescription></CardHeader>
@@ -1547,8 +1568,18 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                     ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, flushes trigger on pagehide / visibilitychange, and a flush that fails re-queues its records instead of dropping them."
                     : "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and flushes trigger on pagehide / visibilitychange." },
                   { title: "Missing tag invalidation", desc: "Bulk removal by tag is rare in JS caches. Blaze Cache assigns monotonic tag IDs and performs invalidation via set difference — no full scan required." },
-                  { title: "Fragmented integrations", desc: isCurrent ? "Axios, fetch(), ky and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model." : "Axios and TanStack Query need separate caching solutions. Blaze provides a single core with first-class adapters for both, sharing the same persistence and stats model." },
-                  { title: "Bundler / asset complexity", desc: "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core; the package resolves it relative to its own URL." },
+                  ...(isBeta ? [
+                    { title: "Cross-session data bleed", desc: "After a logout/login, records restored from IndexedDB can belong to the previous account. Session generations keep each login in its own bucket — rotate() drops the old session's queued and in-flight writes instead of replaying them." },
+                    { title: "Multi-tab write races", desc: "Two tabs flushing the same namespace can disagree about a key. Rows carry a schema stamp and reconcile last-writer-wins per key, so one tab can never resurrect another's stale value." },
+                  ] : []),
+                  { title: "Fragmented integrations", desc: isBeta
+                    ? "Axios, fetch(), ky, ofetch, TanStack Query and SWR each need their own caching solution. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence, subscriptions and stats model."
+                    : isCurrent
+                    ? "Axios, fetch(), ky, TanStack Query and SWR each need their own caching solution. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model."
+                    : "Axios, fetch(), TanStack Query and SWR each need their own caching solution. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model." },
+                  { title: "Bundler / asset complexity", desc: isBeta
+                    ? "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core and resolves relative to its own URL — or you can point at an explicit wasmUrl, a precompiled module, or your own instantiate() loader."
+                    : "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core; the package resolves it relative to its own URL." },
                 ].map((p) => (
                   <Card key={p.title} className="border-border bg-card/60">
                     <CardHeader>
@@ -1569,19 +1600,31 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>One core, many adapters</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, TanStack Query or SWR, the same persistence, stats, and eviction model applies.</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                    ? "A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, ky, ofetch, TanStack Query or SWR, the same persistence, subscriptions, stats and eviction model applies."
+                    : isCurrent
+                    ? "A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, ky, TanStack Query or SWR, the same persistence, stats and eviction model applies."
+                    : "A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, TanStack Query or SWR, the same persistence, stats and eviction model applies."}</p></CardContent>
                 </Card>
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>Synchronous hot path</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">After initialization, every read and write is fully synchronous — no Promises on the hot path. The Wasm module loads once; the rest is pure JS.</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                    ? "After initialization, every read and write is fully synchronous — no Promises on the hot path. The Wasm module loads once (from the shipped binary, or a source you name); the rest is pure TypeScript."
+                    : "After initialization, every read and write is fully synchronous — no Promises on the hot path. The Wasm module loads once; the rest is pure JS."}</p></CardContent>
                 </Card>
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>Durable by default</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">Optional IndexedDB persistence hydrates before the first get, writes are debounced, and flush recoveries mean a failed flush never loses data.</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                    ? "Optional IndexedDB persistence hydrates before the first get, writes are debounced, and a failed flush re-queues instead of losing data. cache.persistence puts flush/clear/hydrate/stats/rotate in reach, and session generations keep one login apart from the next."
+                    : isCurrent
+                    ? "Optional IndexedDB persistence hydrates before the first get, writes are debounced, and flush recoveries mean a failed flush never loses data."
+                    : "Optional IndexedDB persistence hydrates before the first get, writes are debounced, and flushes trigger on pagehide / visibilitychange."}</p></CardContent>
                 </Card>
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>Observable and typed</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload, or to all events at once — and they never block mutations.</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                    ? "Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload or to all events at once — and subscribe()/subscribeMany()/subscribeTag() hand you the value itself, not just the change. Nothing blocks mutations."
+                    : "Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload, or to all events at once — and they never block mutations."}</p></CardContent>
                 </Card>
               </div>
             </section>
