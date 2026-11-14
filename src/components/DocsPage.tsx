@@ -334,7 +334,6 @@ const users = await api('/users');`
                 <div className="relative">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-flame mb-4">Blaze Cache</p>
                   <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] bg-gradient-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6 max-w-4xl">A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly.</h2>
-                  <p className="text-lg md:text-xl text-muted-foreground max-w-3xl leading-relaxed">It combines synchronous reads and writes, SIEVE eviction, tag-based invalidation, optional IndexedDB persistence, and first-class adapters for tools like Axios, fetch, TanStack Query, and SWR — giving you a complete caching layer for real-world frontend apps.</p>
                   <div className="mt-8 flex flex-wrap gap-3">
                     <Badge className="text-sm px-3 py-1">Wasm hot path</Badge>
                     <Badge className="text-sm px-3 py-1">O(1) eviction</Badge>
