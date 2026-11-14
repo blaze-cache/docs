@@ -51,12 +51,116 @@ function VersionLink({ to, active, children }: { to: string; active: boolean; ch
   )
 }
 
+/** Sidebar group heading for a nav id — '' when the item belongs to no group. */
+function navGroup(id: string): string {
+  if (id === "core" || id === "persistence" || id === "wasm") return "Core"
+  if (id === "rq" || id === "swr" || id === "axios" || id === "fetch" || id === "ky" || id === "ofetch") return "Adapters"
+  if (id === "usage") return "Usage"
+  if (id === "repo") return "Repo"
+  return ""
+}
+
 export default function DocsPage({ release: releaseId }: { release: ReleaseId }) {
   const release = RELEASES[releaseId]
-  // Every release except the archived 0.2.5 docs renders the 0.3.0-line content.
+  // Every release except the archived 0.2.5 docs renders the 0.3.0-line content…
   const isCurrent = !release.legacy
+  // …and only the prerelease stacks the 0.4.0 additions on top of it.
+  const isBeta = release.prerelease
   const navItems = release.nav
   const quickStart = release.quickStart.join("\n")
+  // The core example doubles as the wasm-loading story: the 0.4 line points at one
+  // explicit source (or none — the shipped binary is the default), the 0.3 line at the
+  // low-level `wasm` passthrough.
+  const coreExample = isBeta
+    ? `import { createCache } from '@blaze-cache/core';
+
+const cache = await createCache({
+  capacity: 1000,
+  persistence: { namespace: 'my-app' },
+  // wasmUrl: '/assets/blaze_cache_wasm_bg.wasm', // optional — the default resolves the shipped binary
+});`
+    : `import { createCache } from '@blaze-cache/core';
+import wasmUrl from '@blaze-cache/core/pkg/blaze_cache_wasm_bg.wasm?url';
+
+const cache = await createCache({
+  capacity: 1000,
+  persistence: { namespace: 'my-app' },
+  wasm: wasmUrl,
+});`
+  // Beta-only example blocks — each string lives once and feeds both the <pre> and its
+  // copy button.
+  const persistenceExample = `const cache = await createCache({
+  persistence: {
+    namespace: 'app',        // isolates this cache from others in the database
+    debounceMs: 250,         // coalesce writes for 250 ms before hitting storage
+    maxEntries: 2000,        // cap on records written by a single flush
+    restoreExpired: false,   // never resurrect records that expired while away
+    writeMode: 'debounce',   // or 'immediate' — flush on the next task
+    onError: (err) => report(err),   // failures nobody awaited
+    onActivity: (a) => debug(a),     // hydrate/flush/rotate lifecycle
+  },
+});`
+  const controlExample = `await cache.persistence.flush();    // write pending changes now (same as cache.flush())
+await cache.persistence.clear();    // empty this namespace in storage + drop queued writes — memory untouched
+await cache.persistence.hydrate();  // reload storage into memory (merge, not replace)
+cache.persistence.stats();          // { enabled, namespace, generation, pending, hydrates,
+                                    //   restored, skipped, flushes, recordsWritten, aborted,
+                                    //   rotations, errors, lastError, lastFlushAt, lastHydrateAt }
+await cache.persistence.rotate('user:42'); // switch the session bucket — see below
+cache.persistence.enabled;          // false when persistence was never attached
+cache.persistence.generation;       // the current session token ('' when unused)`
+  const accountsExample = `// login — the previous session's queued + in-flight writes are dropped
+await cache.persistence.rotate(\`user:\${userId}\`);
+await cache.persistence.hydrate();   // pull the new account's rows in (optional)
+
+// logout — back to the anonymous bucket
+await cache.persistence.rotate('');
+cache.clear();                       // memory is the caller's to drop`
+  const adapterExample = `interface CachePersistence {
+  load(): Promise<PersistedRecord[]>;
+  save(records: PersistedRecord[]): Promise<void>;
+  remove(keys: string[]): Promise<void>;
+  clear(): Promise<void>;
+  keys?(): Promise<string[]>;                             // reconciliation
+  write?(ops: { clear, save, remove }): Promise<void>;    // one batch, one transaction
+  rotate?(generation: string): void | Promise<void>;      // adopt a session bucket
+  close?(): Promise<void>;
+}`
+  const wasmExample = `// default — the shipped binary, resolved relative to the package (Vite needs no config)
+await createCache({ capacity: 1000 });
+
+// explicit URL — a public/ asset, a CDN, another origin
+await createCache({ wasmUrl: '/assets/blaze_cache_wasm_bg.wasm' });
+
+// precompiled — you already hold a WebAssembly.Module
+await createCache({ module });
+
+// custom loader — the fetch needs auth headers, retries, or bytes already in memory
+await createCache({
+  instantiate: async () => (await fetch(url, { headers: { authorization } })).arrayBuffer(),
+});`
+  const ofetchWrapExample = `import { ofetch } from 'ofetch';
+import { blazeOfetch } from '@blaze-cache/ofetch';
+
+// wrap an existing instance (including ofetch.create() ones)
+const api = blazeOfetch(ofetch.create({ baseURL: 'https://api.example.com/v1' }), cache, {
+  ttlMs: 30_000,
+  tags: () => ['v1'],
+});
+
+await api('/users/42');      // MISS — network, parsed JSON stored in the background
+await api('/users/42');      // HIT  — replayed from cache
+await api.raw('/users/42');  // HIT  — FetchResponse with x-blaze-cache: HIT`
+  const ofetchCreateExample = `import { createBlazeOfetch } from '@blaze-cache/ofetch';
+
+// ofetch defaults and cache options in one bag
+const api = createBlazeOfetch(cache, {
+  baseURL: 'https://api.example.com/v1',
+  ttlMs: 30_000,
+  tags: () => ['v1'],
+});
+
+const users = await api('/users');`
 
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeId, setActiveId] = useState("overview")
@@ -93,12 +197,13 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
             <h1 className="text-base font-bold tracking-tight leading-none">Blaze Cache</h1>
             <Badge>{release.badge}</Badge>
           </div>
-          {/* Version switcher — stable tracks npm's `latest` tag, the archive keeps the 0.2
-              line readable. Labels come from the release record, so a version bump happens
-              in exactly one place. */}
+          {/* Version switcher — the beta tracks npm's `beta` tag, stable its `latest`,
+              and the archive keeps the 0.2 line readable. Labels come from the release
+              record, so a version bump happens in exactly one place. */}
           <nav aria-label="Documentation version" className="hidden items-center gap-1 rounded-lg border border-border bg-card p-0.5 px-3 lg:flex">
-            <VersionLink to="/" active={isCurrent}>{RELEASES.stable.badge}</VersionLink>
-            <VersionLink to="/0.2.5" active={!isCurrent}>{RELEASES.legacy.badge}</VersionLink>
+            <VersionLink to="/beta" active={releaseId === "beta"}>{RELEASES.beta.badge}</VersionLink>
+            <VersionLink to="/" active={releaseId === "stable"}>{RELEASES.stable.badge}</VersionLink>
+            <VersionLink to="/0.2.5" active={releaseId === "legacy"}>{RELEASES.legacy.badge}</VersionLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-primary hover:text-white" aria-label="Open menu"><Menu size={18} /></button>
@@ -130,8 +235,9 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
             <div className="mt-6 border-t border-border pt-5">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Docs version</p>
               <div className="flex flex-wrap gap-2 px-1">
-                <VersionLink to="/" active={isCurrent}>{RELEASES.stable.badge}</VersionLink>
-                <VersionLink to="/0.2.5" active={!isCurrent}>{RELEASES.legacy.badge}</VersionLink>
+                <VersionLink to="/beta" active={releaseId === "beta"}>{RELEASES.beta.badge}</VersionLink>
+                <VersionLink to="/" active={releaseId === "stable"}>{RELEASES.stable.badge}</VersionLink>
+                <VersionLink to="/0.2.5" active={releaseId === "legacy"}>{RELEASES.legacy.badge}</VersionLink>
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
@@ -151,9 +257,9 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                 <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-secondary rounded-full" />
                 {navItems.map((n, idx) => {
                   const active = activeId === n.id;
-                  const group = n.id === "core" ? "Core" : n.id === "rq" || n.id === "swr" || n.id === "axios" || n.id === "fetch" || n.id === "ky" ? "Adapters" : n.id === "usage" ? "Usage" : n.id === "repo" ? "Repo" : "";
+                  const group = navGroup(n.id);
                   const prev = navItems[idx - 1];
-                  const prevGroup = prev ? (prev.id === "core" ? "Core" : prev.id === "rq" || prev.id === "swr" || prev.id === "axios" || prev.id === "fetch" || prev.id === "ky" ? "Adapters" : prev.id === "usage" ? "Usage" : prev.id === "repo" ? "Repo" : "") : "";
+                  const prevGroup = prev ? navGroup(prev.id) : "";
                   return (
                     <>
                       {group && group !== prevGroup && (
@@ -176,7 +282,13 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
 
           <main className="min-w-0">
             {/* Which release these docs describe */}
-            {isCurrent ? (
+            {release.prerelease ? (
+              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-600/50 bg-card px-5 py-4 text-sm text-muted-foreground">
+                <Badge variant="outline" className="border-amber-600/60 text-amber-700 dark:text-amber-300">beta</Badge>
+                <span>These docs describe <strong>{release.badge}</strong>, a prerelease — install it with <code className="font-mono text-foreground">{release.installTag}</code>, or leave the tag off for the stable release.</span>
+                <Link to="/" className="font-medium text-flame underline underline-offset-4 hover:text-foreground">Stable docs are {RELEASES.stable.badge} →</Link>
+              </div>
+            ) : isCurrent ? (
               <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
                 <Badge variant="outline">stable</Badge>
                 <span>Documenting release <strong>{release.badge}</strong>.</span>
@@ -326,21 +438,7 @@ export default function DocsPage({ release: releaseId }: { release: ReleaseId })
                   <code className="font-mono text-sm text-flame">createCache(options?) → Promise&lt;BlazeCache&gt;</code>
                 </CardHeader>
                 <CardContent className="pt-6 relative">
-                  <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`import { createCache } from '@blaze-cache/core';
-import wasmUrl from '@blaze-cache/core/pkg/blaze_cache_wasm_bg.wasm?url';
-
-const cache = await createCache({
-  capacity: 1000,
-  persistence: { namespace: 'my-app' },
-  wasm: wasmUrl,
-});`}</code></pre><CopyButton text="import { createCache } from '@blaze-cache/core';
-import wasmUrl from '@blaze-cache/core/pkg/blaze_cache_wasm_bg.wasm?url';
-
-const cache = await createCache({
-  capacity: 1000,
-  persistence: { namespace: 'my-app' },
-  wasm: wasmUrl,
-});" />
+                  <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{coreExample}</code></pre><CopyButton text={coreExample} />
                 </CardContent>
               </Card>
 
@@ -454,10 +552,270 @@ offEvict();           // …or just this one handle (idempotent)`} />
                     <code>has</code>, <code>ttl</code>, <code>size</code>) emit nothing.{" "}
                     <code>dispose()</code> clears every listener along with the wasm memory.
                   </p>
+
+                  {isBeta && (
+                    <div className="mt-8 space-y-6">
+                      <Card className="border-border bg-card overflow-hidden">
+                        <CardHeader className="border-b border-border">
+                          <code className="font-mono text-sm text-flame">subscribe / subscribeMany / subscribeTag — new in {release.version}</code>
+                        </CardHeader>
+                        <CardContent className="pt-6 relative">
+                          <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`// The value-oriented front end of events: hand over a key, get the current value back.
+const stop = cache.subscribe('user:42', (user, change) => {
+  console.log(change.type, user);      // 'set' → the new value, 'delete' → undefined
+});
+
+const stopMany = cache.subscribeMany(['a', 'b'], (key, value, change) => {
+  console.log(key, value, change.type);
+});
+
+const stopTag = cache.subscribeTag('user', ({ tag, keys, change }) => {
+  console.log(tag, keys, change.type); // 'user', ['user:42'], 'invalidate'
+});
+
+stop(); stopMany(); stopTag();         // idempotent — also safe from inside a listener`}</code></pre><CopyButton text={`// The value-oriented front end of events: hand over a key, get the current value back.
+const stop = cache.subscribe('user:42', (user, change) => {
+  console.log(change.type, user);      // 'set' → the new value, 'delete' → undefined
+});
+
+const stopMany = cache.subscribeMany(['a', 'b'], (key, value, change) => {
+  console.log(key, value, change.type);
+});
+
+const stopTag = cache.subscribeTag('user', ({ tag, keys, change }) => {
+  console.log(tag, keys, change.type); // 'user', ['user:42'], 'invalidate'
+});
+
+stop(); stopMany(); stopTag();         // idempotent — also safe from inside a listener`} />
+                        </CardContent>
+                      </Card>
+                      <p className="text-muted-foreground max-w-3xl">
+                        The value is what the cache holds <em className="text-foreground not-italic font-medium">now</em>: the new
+                        value after <code>set</code>, the unchanged one after <code>touch</code>, and{" "}
+                        <code>undefined</code> after a removal — for <code>evict</code> /{" "}
+                        <code>expire</code> the dropped reference is still on{" "}
+                        <code>change.value</code>. <code>hit</code> and <code>miss</code> are not part
+                        of a subscription at all: a lookup never wakes one. Tag subscriptions are the
+                        part raw events cannot express — a removal carries no tags, so the layer keeps
+                        a per-tag mirror of the live keys and attributes every removal to the tags it
+                        actually hit, including entries dropped by a capacity sweep or a lapsed TTL.
+                        Delivery matches the event system: synchronous, a throwing subscriber logged
+                        and skipped, <code>{'{ once: true }'}</code> fires once then unsubscribes
+                        itself. Everything is opt-in — with no subscription alive the layer does not
+                        exist, and <code>get</code>/<code>set</code> are exactly what they were.
+                      </p>
+                    </div>
+                  )}
                 </section>
 
                 <Separator className="my-16 bg-border" />
               </>
+
+            {/* Persistence + wasm loading — the 0.4 beta's own sections */}
+            {isBeta && (
+              <>
+                <section id="persistence" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Database size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Persistence</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    Optional write-through storage, off by default: pass{" "}
+                    <code className="text-flame">persistence</code> to{" "}
+                    <code className="text-flame">createCache()</code> and it hydrates before the
+                    promise resolves, then keeps writing in the background — debounced, coalesced
+                    per key, flushed on <code>pagehide</code> and <code>visibilitychange</code>.
+                    This release adds a control surface, session isolation and a schema stamp on
+                    top of that.
+                  </p>
+
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">createCache(&#123; persistence: … &#125;)</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{persistenceExample}</code></pre><CopyButton text={persistenceExample} />
+                    </CardContent>
+                  </Card>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "namespace", sig: "string = 'default'", desc: "Key prefix isolating this cache in the store — two caches in one database never collide. Never contains \\0; the key is built as namespace\\0generation\\0key." },
+                      { name: "generation", sig: "string = ''", desc: "Session bucket folded into the key space: rows written under one generation are invisible to every other. Change it through persistence.rotate(), never by hand." },
+                      { name: "debounceMs", sig: "number = 400", desc: "How long a write waits for more writes before reaching storage — the window where coalescing happens (three writes to one key produce one row). Finite, >= 0. Legacy alias: flushDelayMs." },
+                      { name: "maxEntries", sig: "number = 2000", desc: "Records one flush writes at most, newest dirty keys win. Integer >= 1 — validated, because 0 would persist everything. Legacy alias: maxRecords." },
+                      { name: "restoreExpired", sig: "boolean = false", desc: "Restore records whose TTL elapsed while the tab was away — with their original window restarted from now, never the dead remainder." },
+                      { name: "writeMode", sig: "'debounce' | 'immediate'", desc: "'debounce' (default) waits debounceMs; 'immediate' flushes on the next task after a mutation, still coalescing everything written within it into one pass." },
+                      { name: "onError", sig: "(error) => void", desc: "Receives failures nobody awaited — the timer's flush, the pagehide flush, a startup that fell back to memory-only. Awaited calls still reject. Default: console.error." },
+                      { name: "onActivity", sig: "(activity) => void", desc: "Hydrate and flush start/finish, passes aborted by a rotation, rotations and errors — a channel deliberately separate from the cache's event bus." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    The legacy spellings <code>flushDelayMs</code> and <code>maxRecords</code>{" "}
+                    still work as aliases; passing both spellings with different values throws. Every
+                    option is validated when persistence is attached — a negative{" "}
+                    <code>debounceMs</code>, a <code>maxEntries</code> below <code>1</code>, an
+                    unknown <code>writeMode</code> or a NUL in the namespace throws from{" "}
+                    <code>create</code> rather than misbehaving later.
+                  </p>
+
+                  <h4 className="mt-10 mb-4 text-xl font-bold font-mono tracking-tight">The control API: cache.persistence</h4>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">flush · clear · hydrate · stats · rotate</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{controlExample}</code></pre><CopyButton text={controlExample} />
+                    </CardContent>
+                  </Card>
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Every method is safe to call on a cache created{" "}
+                    <strong className="text-foreground">without</strong> persistence: they resolve as
+                    no-ops and <code>stats()</code> reports <code>enabled: false</code>, so
+                    application code never has to branch. <code>hydrate()</code> merges — memory-only
+                    entries survive — which makes it usable as a "storage caught up, pull it in"
+                    call. A failure rejects <em className="text-foreground not-italic font-medium">that</em>{" "}
+                    promise while leaving persistence attached and healthy; core reads and writes are
+                    never affected.
+                  </p>
+
+                  <h4 className="mt-10 mb-4 text-xl font-bold font-mono tracking-tight">Accounts and logout/login</h4>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">rotate() switches the session bucket</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{accountsExample}</code></pre><CopyButton text={accountsExample} />
+                    </CardContent>
+                  </Card>
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Rotation is stronger than clearing memory. Every write{" "}
+                    <strong className="text-foreground">queued</strong> by the previous session is
+                    discarded before it reaches storage, and every flush or hydrate still{" "}
+                    <strong className="text-foreground">in flight</strong> fails its next epoch check
+                    and drops the work it claimed — counted in <code>stats().aborted</code>, never
+                    as an error — so a slow write cannot repopulate the next session's rows. The
+                    adapter snapshots its bucket per operation, so a write that started before{" "}
+                    <code>rotate()</code> lands in the <em className="text-foreground not-italic font-medium">previous</em>{" "}
+                    generation's rows, invisible to the new one. Rows already stored are preserved —
+                    log back in as that account and they are there; call <code>clear()</code> first
+                    if you want them wiped instead.
+                  </p>
+
+                  <h4 className="mt-10 mb-4 text-xl font-bold font-mono tracking-tight">Schema versioning and failure containment</h4>
+                  <p className="max-w-3xl text-muted-foreground">
+                    Rows carry a schema stamp (<code>v</code>). Unversioned rows written by older
+                    releases are adopted in place on first load; rows from a{" "}
+                    <strong className="text-foreground">newer</strong> schema — a downgrade — reset
+                    the namespace with a console warning rather than being misread. Individual
+                    corrupt rows (missing key, bad tags, bad TTL) cost exactly themselves: the rest
+                    of the hydrate proceeds, with a single warning for the run. Failures are
+                    contained at both ends — an adapter that cannot open at all (private mode,
+                    enterprise policy) degrades to memory-only with a warning instead of breaking
+                    the app, and a flush that fails later puts every record it claimed straight back
+                    on the queue so the next flush retries them. A record that fails on its own earns
+                    one strike per pass and is dropped after three (the entry stays in memory), so
+                    one poison record cannot block every later flush; any successful pass clears the
+                    strikes.
+                  </p>
+
+                  <h4 className="mt-10 mb-4 text-xl font-bold font-mono tracking-tight">Custom adapters</h4>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">interface CachePersistence</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{adapterExample}</code></pre><CopyButton text={adapterExample} />
+                    </CardContent>
+                  </Card>
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Any storage plugs in through the <code>adapter</code> option.{" "}
+                    <code>keys()</code> keeps it honest — the core drops entries on its own (a
+                    capacity eviction or a lapsed TTL never queues a delete), so without a listing
+                    those rows would outlive every flush and re-hydrate at the next startup.{" "}
+                    <code>write()</code> hands the whole flush over as one unit of work so an
+                    adapter can commit it in a single transaction — the built-in adapter does
+                    exactly that. <code>rotate()</code> tells the adapter to switch buckets, with
+                    the same in-flight guarantee as above; adapters without these hooks keep working
+                    exactly as before.
+                  </p>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    <strong className="text-foreground">Multiple tabs</strong> share one IndexedDB
+                    namespace but nothing else: each holds its own wasm instance, hydrated once at
+                    startup, and each flushes the keys it wrote. Writes are{" "}
+                    <strong className="text-foreground">last-writer-wins per key</strong> — right for
+                    ordinary use (the foreground tab refetches on focus), but a hidden tab can flush
+                    a value older than the one the focused tab just wrote. If it matters, keep{" "}
+                    <code>ttlMs</code> short on records written from background tabs, or filter on a
+                    timestamp stored inside the value.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+
+                <section id="wasm" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Zap size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Wasm Loading</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    <code className="text-flame">createCache()</code> loads the{" "}
+                    <code>.wasm</code> binary exactly once per page, no matter how many caches you
+                    create. The load is explicit and async — nothing is inlined as base64 — and
+                    this release standardises where the bytes come from: one source option, or the
+                    shipped default.
+                  </p>
+
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">four ways to name the binary — or none</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{wasmExample}</code></pre><CopyButton text={wasmExample} />
+                    </CardContent>
+                  </Card>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "(none)", sig: "the shipped default", desc: "The package fetches the binary shipped inside @blaze-cache/core, resolved relative to its own module URL — bundlers rewrite that into an emitted asset, so Vite needs no configuration at all. Concurrent createCache() calls share one download and one compile." },
+                      { name: "wasmUrl", sig: "string | URL", desc: "Where the binary actually lives: a public/ asset path, a CDN, another origin, a signed path. The right call when a bundler pre-bundles dependencies and rewrites import.meta.url." },
+                      { name: "module", sig: "WebAssembly.Module", desc: "A precompiled module — no fetch and no compile at all. For a service worker, a warm WebAssembly.compileStream, a test fixture." },
+                      { name: "instantiate", sig: "() => source | Promise<source>", desc: "A full custom loader for auth headers, retries, or bytes already in memory. It must resolve to a source — URL, Request, bytes, module — never an Instance: the generated glue owns linking." },
+                      { name: "wasm", sig: "WasmInitInput", desc: "Low-level passthrough straight to wasm-bindgen's init() — equivalent to wasmUrl for a URL, and the way to hand over pre-read bytes (what the Node test suites do)." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Pass at most one of <code>wasmUrl</code>, <code>module</code> and{" "}
+                    <code>instantiate</code> — two at once throws a <code>TypeError</code> rather
+                    than silently picking one. Failures are explicit: a wrong path reports the HTTP
+                    status and the URL, an unreachable server reports the fetch error (kept on{" "}
+                    <code>error.cause</code>), and corrupt bytes report the compile failure — each
+                    with what to try instead. The pre-bundling caveat still applies: exclude{" "}
+                    <code>@blaze-cache/core</code> from pre-bundling (as every example here does) or
+                    point at the binary with <code>wasmUrl</code>.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+              </>
+            )}
 
             {/* Axios */}
             <section id="axios" className="mb-20 scroll-mt-28">
@@ -501,6 +859,20 @@ offEvict();           // …or just this one handle (idempotent)`} />
                     as zero.
                   </p>
                 </>
+              )}
+              {isBeta && (
+                <p className="mb-6 max-w-3xl text-muted-foreground">
+                  This cycle added <strong className="text-foreground">per-request control</strong>:
+                  pass <code>blazeCache</code> on any request config to override{" "}
+                  <code>enabled</code>, <code>ttlMs</code>, <code>tags</code>, <code>key</code>,{" "}
+                  <code>varyHeaders</code> and <code>forceRefresh</code> for that one call —{" "}
+                  <code>blazeCache: false</code> bypasses the cache entirely, an{" "}
+                  <code>invalidateTags</code> list purges after a mutation, and{" "}
+                  <code>invalidateCacheTags(cache, ...tags)</code> is the standalone helper.
+                  Request bodies join the default key as well: an opted-in <code>POST</code> with
+                  two payloads occupies two entries, and a body no encoder can read leaves that
+                  request uncached rather than replaying one response for the other.
+                </p>
               )}
               <div className="grid grid-cols-1 gap-6">
                 <Card className="border-border bg-card">
@@ -631,6 +1003,18 @@ const api = axios.create({
                       ignored rather than read as zero.
                     </p>
                   )}
+                  {isBeta && (
+                    <p className="text-muted-foreground mb-6 max-w-3xl">
+                      Per-request overrides land here too: <code>forceRefresh</code> (or the
+                      standard <code>cache: 'reload'</code>) skips the read and rewrites the entry,
+                      so the next request is a HIT again, and <code>blazeCache</code> on the init —{" "}
+                      <code>false</code> to bypass, or{" "}
+                      <code>&#123; enabled, ttlMs, tags, key, varyHeaders, forceRefresh, invalidateTags &#125;</code>{" "}
+                      — tunes a single call. A mutation can purge its tags straight from the
+                      request, and <code>invalidateCacheTags()</code> exports the same helper the
+                      axios adapter has.
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-1 gap-6">
                     <Card className="border-border bg-card overflow-hidden">
@@ -724,7 +1108,7 @@ cache.invalidateTags('fetch');`} />
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Ky Adapter</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    {!isBeta && <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>}
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     The <code className="text-flame">@blaze-cache/ky</code> package caches ky
@@ -841,6 +1225,80 @@ const users = await api.get('users').json();`} />
                   </>
                 )}
 
+                {isBeta && (
+                  <section id="ofetch" className="mb-20 scroll-mt-28">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
+                      <h3 className="text-3xl font-bold font-mono tracking-tight">Ofetch Adapter</h3>
+                      <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    </div>
+                    <p className="text-muted-foreground mb-6 max-w-3xl">
+                      The <code className="text-flame">@blaze-cache/ofetch</code> package brings the
+                      same cache to ofetch / <code>$fetch</code> — the HTTP client behind Nuxt and
+                      Nitro. Wrap an instance you already have, or create one from scratch with
+                      ofetch defaults and cache options in a single bag; every eligible response is
+                      stored in the same cache and replayed from it.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      <Card className="border-border bg-card overflow-hidden">
+                        <CardHeader className="border-b border-border">
+                          <code className="font-mono text-sm text-flame">blazeOfetch(instance, cache, options) → cached $fetch</code>
+                        </CardHeader>
+                        <CardContent className="pt-6 relative">
+                          <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{ofetchWrapExample}</code></pre><CopyButton text={ofetchWrapExample} />
+                        </CardContent>
+                      </Card>
+                      <Card className="border-border bg-card overflow-hidden">
+                        <CardHeader className="border-b border-border">
+                          <code className="font-mono text-sm text-flame">createBlazeOfetch(cache, options) → one bag, split apart</code>
+                        </CardHeader>
+                        <CardContent className="pt-6 relative">
+                          <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{ofetchCreateExample}</code></pre><CopyButton text={ofetchCreateExample} />
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <p className="mt-6 text-muted-foreground max-w-3xl">
+                      The wrapped instance keeps ofetch's full API — call it directly for parsed
+                      data, <code>.raw()</code> for the <code>FetchResponse</code> carrying the{" "}
+                      <code>x-blaze-cache</code> marker, <code>.native</code> for the underlying
+                      fetch, and <code>.create()</code> for derived instances, whose defaults apply
+                      to both the request and the cache key. <code>Cache-Control</code> is honoured
+                      on both sides when <code>cacheControl</code> is on, and <code>Vary</code> is
+                      always honoured. There is no stale-while-revalidate here — for SWR with an{" "}
+                      <code>STALE</code> marker, use <code className="text-flame">@blaze-cache/fetch</code>.
+                    </p>
+
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { name: "ttlMs", sig: "number | (response, ctx) => number", desc: "Freshness window in ms. Default 60_000; a response Cache-Control: max-age overrides it, minus its Age. <= 0 means don't store." },
+                        { name: "methods", sig: "string[]", desc: "Methods eligible for caching. Default ['GET'] — pass ['GET', 'HEAD'] to include HEAD. Anything else always hits the network." },
+                        { name: "cacheControl", sig: "boolean", desc: "Honour Cache-Control on both sides: request no-store skips read and write, no-cache / max-age=0 skip the read, response max-age sets the TTL and no-store / no-cache stop it being stored. Vary is always honoured. Default true." },
+                        { name: "key", sig: "(ctx) => string", desc: "Builds the cache key from the resolved request identity. Default is '<method> <url>' plus a hash of varyHeaders and the request body — defaultCacheKey, exported for building on." },
+                        { name: "shouldCache", sig: "(response, ctx) => boolean", desc: "Decides what gets stored. Default: 2xx only. A callback that throws is treated as a rejection after one console warning — a cache failure never fails a response." },
+                        { name: "tags", sig: "(response, ctx) => string[]", desc: "Tags on stored responses. Default ['ofetch', '<method> <url>'] — invalidateTags('ofetch') drops them all at once, the second drops one resource." },
+                        { name: "varyHeaders", sig: "string[]", desc: "Request headers folded into the key — and the whitelist the response's Vary is checked against: Vary: * is never stored, and one varying outside the list is left uncached. Default ['authorization']." },
+                        { name: "markerHeader", sig: "string | false", desc: "Header written as HIT / MISS on replayed responses. Default 'x-blaze-cache'; pass false to disable the marker." },
+                      ].map((o) => (
+                        <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                          <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                          <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                          <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="mt-6 text-muted-foreground max-w-3xl">
+                      Two fixes landed alongside the package: defaults passed to{" "}
+                      <code>ofetch.create()</code> now apply to both the request and the cache key
+                      — an instance's own <code>baseURL</code>, hidden in a closure, is learned
+                      from the first response instead of being invisible to the key — and two
+                      different origins can no longer share one cache entry.
+                    </p>
+                  </section>
+                )}
+
                 <Separator className="my-16 bg-border" />
               </>
 
@@ -930,6 +1388,17 @@ const users = await api.get('users').json();`} />
                   Per-call stamps win: a <code>ttlMs</code> or <code>tags</code> passed at the
                   call site now beats the provider config instead of losing to it — the options
                   you pass are the ones that stick.
+                </p>
+              )}
+              {isBeta && (
+                <p className="text-muted-foreground mb-6 max-w-3xl">
+                  New in this release: a call-site <code>forceRefresh</code> skips the persisted
+                  seed but keeps the write, so the next mount starts from it — pull-to-refresh
+                  without going stale; <code>tags</code> accepts a resolver run at write time from
+                  the key and data; a cache that throws costs a console warning instead of a
+                  broken hook; and <code>invalidateBlazeSWR(cache, ...tags)</code> purges only this
+                  package's envelopes — a neighbour integration's entry wearing the same tag
+                  survives.
                 </p>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1038,7 +1507,9 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 {[
                   { title: "Unpredictable JS eviction", desc: "LRU and WeakRef heuristics create object churn and non-deterministic cache hits. SIEVE offers a scan-resistant, O(1)-amortised algorithm with a tiny footprint." },
                   { title: "Async overhead on hot path", desc: "Standard caches return Promises for reads after initialization. Blaze Cache instantiates Wasm once during createCache(), so every get/set is fully synchronous." },
-                  { title: "No durable persistence", desc: isCurrent
+                  { title: "No durable persistence", desc: isBeta
+                    ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and cache.persistence puts flush/clear/hydrate/stats/rotate at your fingertips — with session generations isolating one login from the next and a schema stamp keeping reads safe across versions."
+                    : isCurrent
                     ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, flushes trigger on pagehide / visibilitychange, and a flush that fails re-queues its records instead of dropping them."
                     : "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and flushes trigger on pagehide / visibilitychange." },
                   { title: "Missing tag invalidation", desc: "Bulk removal by tag is rare in JS caches. Blaze Cache assigns monotonic tag IDs and performs invalidation via set difference — no full scan required." },
