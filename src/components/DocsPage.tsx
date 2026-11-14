@@ -166,7 +166,32 @@ const users = await api('/users');`
   const [activeId, setActiveId] = useState("overview")
 
   useEffect(() => {
-    document.title = "Blaze Cache — Full-Featured Client-Side Cache"
+    // The SPA ships one index.html for every route, so title, description, canonical and
+    // the social tags are rewritten here for whichever release the URL selected — the
+    // crawlers that render JS see per-page metadata, the rest fall back to index.html.
+    const r = RELEASES[releaseId]
+    const title = r.prerelease
+      ? `Blaze Cache ${r.version} (prerelease) — Docs`
+      : r.legacy
+        ? `Blaze Cache ${r.version} (archive) — Docs`
+        : "Blaze Cache — Full-Featured Client-Side Cache"
+    const routePath = releaseId === "stable" ? "/" : releaseId === "beta" ? "/beta" : "/0.2.5"
+    const canonical = `https://blaze-cache.github.io${import.meta.env.BASE_URL.replace(/\/+$/, "")}${routePath}`
+    const setMeta = (selector: string, attr: "content" | "href", value: string) => {
+      document.querySelector(selector)?.setAttribute(attr, value)
+    }
+
+    document.title = title
+    setMeta('meta[name="title"]', "content", title)
+    setMeta('meta[name="description"]', "content", r.metaDescription)
+    setMeta('meta[property="og:title"]', "content", title)
+    setMeta('meta[property="og:description"]', "content", r.metaDescription)
+    setMeta('meta[property="og:url"]', "content", canonical)
+    setMeta('meta[name="twitter:title"]', "content", title)
+    setMeta('meta[name="twitter:description"]', "content", r.metaDescription)
+    setMeta('meta[name="twitter:url"]', "content", canonical)
+    setMeta('link[rel="canonical"]', "href", canonical)
+
     // Switching versions rewrites the URL without a reload — keep deep links where they are.
     if (!window.location.hash) window.scrollTo({ top: 0 })
   }, [releaseId])
