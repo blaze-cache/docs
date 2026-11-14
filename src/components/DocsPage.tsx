@@ -274,9 +274,11 @@ const users = await api('/users');`
 
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-16">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[260px_1fr]">
-          {/* Sidebar */}
+          {/* Sidebar — sticky and vertically scrollable: the beta route lists 17
+              sections, which can exceed a short viewport. The scrollbar itself is
+              hidden (still wheel/trackpad/keyboard scrollable). */}
           <aside className="hidden lg:block">
-            <nav className="sticky top-24">
+            <nav className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="relative pl-4">
                 {/* Vertical line */}
                 <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-secondary rounded-full" />
