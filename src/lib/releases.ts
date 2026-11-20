@@ -11,6 +11,8 @@ export interface WhatsNewItem { kind: string; title: string; desc: string; href:
 export interface Release {
   id: ReleaseId; version: string; badge: string; legacy: boolean; prerelease: boolean; installTag: string;
   metaDescription: string;
+  /** Automated test totals for this release, shown in the Overview hero. */
+  tests: { total: number; detail: string };
   packages: PackageCard[]; quickStart: string[]; whatsNew: WhatsNewItem[]; nav: NavItem[];
   coreMethods: MethodInfo[]; commands: CommandInfo[]; examples: ExampleInfo[]; layout: string;
 }
@@ -186,6 +188,7 @@ const EXAMPLES_LEGACY: ExampleInfo[] = [
 const CURRENT_RELEASE: Release = {
   id: "stable", version: "0.3.0", badge: "v0.3.0", legacy: false, prerelease: false, installTag: "",
   metaDescription: "A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly. Synchronous reads, a drop-in fetch() replacement, axios, ky and SWR adapters, and TanStack Query integration.",
+  tests: { total: 350, detail: "286 JS · 43 Rust engine · 4 doctests · 17 wasm" },
   packages: [
     { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
     { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
@@ -230,6 +233,7 @@ const CURRENT_RELEASE: Release = {
 const BETA_RELEASE: Release = {
   id: "beta", version: "0.4.0-beta", badge: "v0.4.0-beta", legacy: false, prerelease: true, installTag: "@beta",
   metaDescription: "Blaze Cache 0.4.0-beta prerelease documentation: hardened IndexedDB persistence with session rotation and a flush/clear/hydrate/stats/rotate control API, value subscriptions, standardized wasm loading, and the new @blaze-cache/ofetch adapter.",
+  tests: { total: 584, detail: "507 JS · 49 Rust engine · 3 allocation · 4 doctests · 21 wasm" },
   packages: [
     { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
     { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
@@ -278,6 +282,7 @@ export const RELEASES: Record<ReleaseId, Release> = {
   legacy: {
     id: "legacy", version: "0.2.5", badge: "v0.2.5", legacy: true, prerelease: false, installTag: "",
     metaDescription: "Documentation for Blaze Cache 0.2.5, an archived release: TTLs, tags, SIEVE eviction, IndexedDB persistence, and the axios, fetch, TanStack Query and SWR integrations.",
+    tests: { total: 175, detail: "119 JS · 41 Rust engine · 3 doctests · 12 wasm" },
     packages: [
       { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
       { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },

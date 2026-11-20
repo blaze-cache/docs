@@ -340,7 +340,11 @@ const users = await api('/users');`
                     <Badge className="text-sm px-3 py-1">Wasm hot path</Badge>
                     <Badge className="text-sm px-3 py-1">O(1) eviction</Badge>
                     <Badge className="text-sm px-3 py-1">ESM only</Badge>
+                    <Badge variant="outline" className="text-sm px-3 py-1">{release.tests.total} tests</Badge>
                   </div>
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Verified by <strong className="text-foreground">{release.tests.total} automated tests</strong> — {release.tests.detail}. The offline suites need no network.
+                  </p>
                 </div>
               </div>
 
