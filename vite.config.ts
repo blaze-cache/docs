@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 
 /**
  * GitHub Pages answers any path it doesn't have on disk with `404.html`. Without a copy of
- * the app there, loading https://blaze-cache.github.io/docs/beta directly (or refreshing
+ * the app there, loading https://blaze-cache.github.io/docs/0.3.0 directly (or refreshing
  * it) would return GitHub's own 404 page and the SPA would never boot — so the build ships
  * the entry document under both names.
  *

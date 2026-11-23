@@ -6,9 +6,9 @@
  * the diagram tracks the light/dark toggle.
  */
 
-/** Adapter labels — the beta release adds ofetch to the family. */
-const adapterLabels = (beta: boolean): string[] =>
-  beta
+/** Adapter labels — the 0.4 line adds ofetch to the family. */
+const adapterLabels = (has040: boolean): string[] =>
+  has040
     ? ["Axios", "Fetch", "Ky", "Ofetch", "React Query", "SWR"]
     : ["Axios", "Fetch", "Ky", "React Query", "SWR"];
 
@@ -43,9 +43,9 @@ const ARCH_CSS = `
   }
 `
 
-export default function ArchitectureDiagram({ beta = false }: { beta?: boolean }) {
-  const centers = adapterCenters(adapterLabels(beta).length)
-  const adapters = adapterLabels(beta).map((label, i) => ({ label, cx: centers[i] }))
+export default function ArchitectureDiagram({ has040 = false }: { has040?: boolean }) {
+  const centers = adapterCenters(adapterLabels(has040).length)
+  const adapters = adapterLabels(has040).map((label, i) => ({ label, cx: centers[i] }))
   const first = centers[0]
   const last = centers[centers.length - 1]
   // The bus runs from the first adapter to at least the persistence drop, so both the
@@ -143,7 +143,7 @@ export default function ArchitectureDiagram({ beta = false }: { beta?: boolean }
           fontSize="11.5"
           textAnchor="middle"
         >
-          {beta
+          {has040
             ? "createCache() · synchronous get/set · typed events · subscribe()"
             : "createCache() · synchronous get/set · typed events"}
         </text>
@@ -183,7 +183,7 @@ export default function ArchitectureDiagram({ beta = false }: { beta?: boolean }
           fontSize="11"
           textAnchor="middle"
         >
-          {beta ? "IndexedDB · debounce · rotate()" : "IndexedDB · debounced writes"}
+          {has040 ? "IndexedDB · debounce · rotate()" : "IndexedDB · debounced writes"}
         </text>
 
         {/* Wasm bridge */}

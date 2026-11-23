@@ -1,7 +1,7 @@
 /**
  * One entry per published release of the library.
  */
-export type ReleaseId = "stable" | "legacy" | "beta";
+export type ReleaseId = "stable" | "previous" | "legacy";
 export interface NavItem { id: string; label: string; }
 export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
 export interface CommandInfo { cmd: string; note: string; }
@@ -10,6 +10,8 @@ export interface PackageCard { pkg: string; note: string; peers: string; }
 export interface WhatsNewItem { kind: string; title: string; desc: string; href: string; more: string; commits: string[]; }
 export interface Release {
   id: ReleaseId; version: string; badge: string; legacy: boolean; prerelease: boolean; installTag: string;
+  /** Marks the newest stable line in the header and version switcher. */
+  isNew: boolean;
   metaDescription: string;
   /** Automated test totals for this release, shown in the Overview hero. */
   tests: { total: number; detail: string };
@@ -40,14 +42,17 @@ const NAV_CURRENT: NavItem[] = [
 const NAV_LEGACY: NavItem[] = NAV_CURRENT.filter((n) => n.id !== "ky");
 
 /**
- * The 0.4.0-beta nav inserts the sections this prerelease adds — persistence and the wasm
- * loading strategy after the core material, the ofetch adapter with the other adapters —
- * and keeps every section the stable page renders, in the order the page emits them.
+ * The 0.4.0 stable nav inserts everything the 0.4 line added — persistence, wasm loading,
+ * storage/memory modes, multi-tab sync and benchmarks after the core material, plus the
+ * ofetch adapter with the other adapters — and keeps every section the previous line had.
  */
-const NAV_BETA: NavItem[] = [
+const NAV_040: NavItem[] = [
   ...NAV_CURRENT.slice(0, 4), // overview … core (events render beneath it)
   { id: "persistence", label: "Persistence" },
   { id: "wasm", label: "Wasm Loading" },
+  { id: "storage", label: "Storage & Memory" },
+  { id: "multitab", label: "Multi-Tab" },
+  { id: "benchmarks", label: "Benchmarks" },
   ...NAV_CURRENT.slice(4, 7), // axios, fetch, ky
   { id: "ofetch", label: "Ofetch" },
   ...NAV_CURRENT.slice(7), // react-query … repo
@@ -89,11 +94,19 @@ const INTROSPECTION: MethodInfo[] = [
   { name: "off", sig: "(type?) | (listener?) => void", desc: "Removes listeners in bulk.", isNew: true },
 ];
 
-/** Value-oriented subscriptions added in the 0.4 line — present only in the beta release. */
+/** Value-oriented subscriptions added in the 0.4 line. */
 const SUBSCRIPTIONS: MethodInfo[] = [
   { name: "subscribe", sig: "(key, listener, options?) => () => void", desc: "Calls back with the current value whenever key changes — set/touch give the value, removals give undefined. Returns an idempotent stop.", isNew: true },
   { name: "subscribeMany", sig: "(keys, listener, options?) => () => void", desc: "One listener for several keys, told which one changed: (key, value, change). Duplicates collapse; an empty list attaches nothing.", isNew: true },
   { name: "subscribeTag", sig: "(tag, listener, options?) => () => void", desc: "Fires when any entry carrying the tag changes — delete, evict, expire, invalidate, prune and clear are attributed through a per-tag mirror.", isNew: true },
+];
+
+/** Opt-in memory modes added in 0.4 — by-reference values remain the default. */
+const STORAGE_METHODS: MethodInfo[] = [
+  { name: "setBytes", sig: "(key, view, options?) => void", desc: "Copies raw bytes once into a Wasm arena region, stored as (offset, length). Not available with storage: 'js'.", isNew: true },
+  { name: "getBytes", sig: "(key) => Uint8Array | undefined", desc: "Zero-copy view onto the arena region — valid only until the next allocation or a memory.grow detaches it.", isNew: true },
+  { name: "getBytesCopy", sig: "(key) => Uint8Array | undefined", desc: "Owned snapshot of the bytes — safe to retain beyond the next allocation.", isNew: true },
+  { name: "setBytesReserved", sig: "(key, ptr, len, options?) => void", desc: "Advanced producer path: adopt a region you already wrote through wasmLinearMemory(), with no JS→Wasm copy.", isNew: true },
 ];
 
 /** The archived 0.2.5 line — the layout it actually shipped with (no ky yet). */
@@ -126,12 +139,12 @@ examples/              one Vite playground per package
 benchmarks/cache/      pnpm bench — adapters vs React Query and SWR
 .github/               rust.yml · js.yml (offline + nightly live) · security.yml`;
 
-/** The beta layout adds the ofetch adapter package. */
-const LAYOUT_BETA = `crates/
-  blaze-cache-core/    Rust engine: slab store, SIEVE queue, tags, TTL, stats
-  blaze-cache-wasm/    wasm-bindgen bindings
+/** The 0.4.0 layout adds ofetch and the published benchmark workspaces. */
+const LAYOUT_040 = `crates/
+  blaze-cache-core/    Rust engine: slab, SIEVE queue, tags, TTL, stats, bytes arena
+  blaze-cache-wasm/    wasm-bindgen bindings (raw keys, tagged writes)
 packages/
-  core/                @blaze-cache/core  (wasm loader, persistence, createCache)
+  core/                @blaze-cache/core  (loader, persistence, storage modes, multi-tab)
   axios/               @blaze-cache/axios (HTTP adapter)
   fetch/               @blaze-cache/fetch (drop-in fetch() replacement)
   ky/                  @blaze-cache/ky (ky.extend hook, ky v1 + v2)
@@ -140,8 +153,13 @@ packages/
   swr/                 @blaze-cache/swr (SWR persist + hook)
   integration-tests/   several packages sharing one cache
 examples/              one Vite playground per package
-benchmarks/cache/      pnpm bench — adapters vs React Query and SWR
-.github/               rust.yml · js.yml (offline + nightly live) · security.yml`;
+benchmarks/
+  cache/               pnpm bench — Node matrix, 10 scenarios × 5 payload sizes
+  browser/             pnpm bench:browser — the same suite in headless Chrome
+  framework/           TanStack Query / SWR cache-store comparison
+  results/             published JSON + checked-in CI baseline
+docs/                  benchmarks/RESULTS.md · plan/0.4.0-roadmap.md · security/
+.github/               rust.yml · js.yml (offline + live + bench:ci) · security.yml`;
 
 /** Repo commands, with what each one runs — the current workspace's scripts. */
 const COMMANDS_CURRENT: CommandInfo[] = [
@@ -155,6 +173,16 @@ const COMMANDS_CURRENT: CommandInfo[] = [
   { cmd: "pnpm bench", note: "adapters vs React Query and SWR" },
   { cmd: "pnpm lint", note: "clippy -D warnings + rustfmt + tsc --noEmit" },
   { cmd: "pnpm clean", note: "remove build outputs" },
+];
+
+/** 0.4 adds the browser/framework benches and the same-runner A/B regression gate. */
+const COMMANDS_040: CommandInfo[] = [
+  ...COMMANDS_CURRENT.map((c) =>
+    c.cmd === "pnpm bench" ? { cmd: c.cmd, note: "Node matrix: 10 scenarios × 5 payload sizes" } : c,
+  ),
+  { cmd: "pnpm bench:browser", note: "the same matrix in headless Chrome" },
+  { cmd: "pnpm bench:framework", note: "TanStack Query / SWR cache stores" },
+  { cmd: "pnpm bench:ci", note: "quick run + 20% regression gate" },
 ];
 
 /** The 0.2 line's command set, as that release shipped it. */
@@ -183,10 +211,60 @@ const EXAMPLES_LEGACY: ExampleInfo[] = [
   { dir: "examples/browser", cmd: "pnpm dev", note: "The one browser example the 0.2 line shipped with" },
 ];
 
-// The current stable release: published on npm as 0.3.0 under the `latest` dist-tag, so
-// every install command below is untagged (`installTag` stays empty).
+// The current stable release: published on npm as 0.4.0 under the `latest` dist-tag, so
+// every install command below is untagged (`installTag` stays empty). It carries the whole
+// 0.4 line: published benchmarks, opt-in memory modes, multi-tab sync and a final
+// write-path tuning pass, on top of the persistence/adapters work first staged in beta.
 const CURRENT_RELEASE: Release = {
-  id: "stable", version: "0.3.0", badge: "v0.3.0", legacy: false, prerelease: false, installTag: "",
+  id: "stable", version: "0.4.0", badge: "v0.4.0", legacy: false, prerelease: false, isNew: true, installTag: "",
+  metaDescription: "Blaze Cache 0.4.0: published Node and browser benchmarks, zero-copy bytes mode, opt-in JS-authoritative storage, multi-tab synchronization, hardened IndexedDB persistence, value subscriptions, and adapters for axios, fetch, ky, ofetch, React Query and SWR — powered by Rust and WebAssembly.",
+  tests: { total: 600, detail: "479 package/integration · 27 benchmark-suite checks · 57 Rust engine · 5 allocation · 4 doctests · 28 wasm" },
+  packages: [
+    { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
+    { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
+    { pkg: "@blaze-cache/fetch", note: "Drop-in fetch() with HTTP caching", peers: "None" },
+    { pkg: "@blaze-cache/ky", note: "ky HTTP adapter (ky v1 & v2)", peers: "ky >= 1.14 || 2" },
+    { pkg: "@blaze-cache/ofetch", note: "ofetch / $fetch HTTP adapter (Nuxt & Nitro)", peers: "ofetch >= 1.0" },
+    { pkg: "@blaze-cache/react-query", note: "TanStack Query v5 integration", peers: "@tanstack/react-query >= 5.0.0" },
+    { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
+  ],
+  quickStart: [
+    "# core is the only package you must install", "npm install @blaze-cache/core", "",
+    "# then only the integrations you use",
+    "npm install @blaze-cache/axios",
+    "npm install @blaze-cache/fetch",
+    "npm install @blaze-cache/ky",
+    "npm install @blaze-cache/ofetch",
+    "npm install @blaze-cache/react-query",
+    "npm install @blaze-cache/swr", "",
+    "# peers — only for the adapters above", "npm install axios", "npm install ky", "npm install ofetch", "npm install @tanstack/react-query", "",
+    "# optional: SWR config", "npm install swr",
+  ],
+  whatsNew: [
+    { kind: "new", title: "Multi-tab synchronization", desc: "Opt in with `multiTab: { enabled: true }`: one `BroadcastChannel` per namespace and generation carries set, delete, clear, tag-invalidation and rotation, plus a `hello`/`state` handshake on focus. A hybrid logical clock, a per-client sequence and a deterministic `clientId` order writes, and a per-key version guard means a hidden tab can no longer overwrite a newer value with a stale flush. Remote changes fire `remote-*` events without re-broadcasting, and flushes are serialised with a Web Lock where available.", href: "#multitab", more: "Multi-Tab", commits: ["aa19bb5", "6500f8d", "85ec3e0", "f8b9557"] },
+    { kind: "new", title: "Zero-copy bytes and JS-authoritative storage", desc: "Two opt-in memory modes join the by-reference default. `setBytes` stores a `Uint8Array` once in a safe Wasm arena and `getBytes` returns a view with no second copy (`getBytesCopy` for a retained snapshot); advanced callers can adopt a pre-written region with `setBytesReserved`. `storage: 'js'` keeps keys, TTL, tags and stable ids in Wasm while values live in a JS `Map`, with by-id hot reads. Both are off by default and measured, not assumed, in the published deltas.", href: "#storage", more: "Storage & Memory", commits: ["22d1568", "4efbec0", "4f703c2", "29396ef"] },
+    { kind: "testing", title: "Published benchmarks: Node and a real browser", desc: "Ten scenarios across five payload sizes and two value representations, run in Node and in headless Chrome, with raw JSON, hardware and methodology published. The matrix shows no payload-size cliff — values are held by reference and never serialised on the hot path. The honest caveat stays: the boundary crossing costs real time on writes, so no unqualified 'faster than JS' claim is made.", href: "#benchmarks", more: "Benchmarks", commits: ["b0ac7ac", "f7fdf27", "d1fea0b", "fc4cb54", "a82710a"] },
+    { kind: "perf", title: "Tagged raw writes and a bulk producer path", desc: "The final tuning pass removes per-write key and tag allocations from the headline workload: tagged writes take the key from `KeyScratch` and tags from a shared flat buffer, `setManyRaw` extends that to batches, and all offsets are validated in safe Rust. Same-run A/B put `full-featured` 2% faster in Node and 4% in Chrome; the other scenarios stayed inside their spread. Tag-name interning was measured, judged unjustified and left out.", href: "#core", more: "Core API", commits: ["6b0c3c2", "cbeed29", "ce00c07", "3f6808c"] },
+    { kind: "new", title: "Persistence, hardened: sessions, schema and a control API", desc: "`cache.persistence` is a full control surface now — `flush()`, `clear()`, `hydrate()`, `stats()` and `rotate()` — over an adapter that folds a rotatable session generation into the key space: rotation drops every queued write and every flush still in flight, so a late save can no longer repopulate the next login's rows. Rows carry a schema stamp — storage written by a newer schema resets the namespace loudly instead of being misread, a corrupt row costs exactly itself — the options gain `namespace`, `debounceMs`, `maxEntries`, `restoreExpired`, `writeMode`, `onError` and `onActivity` (the old spellings remain as aliases), and each flush reaches storage as one batched transaction on a single reused connection.", href: "#persistence", more: "Persistence", commits: ["994c4ae", "a77cb59", "c14740e"] },
+    { kind: "new", title: "Value subscriptions: `subscribe`, `subscribeMany`, `subscribeTag`", desc: "Hand a key, a list of keys or a tag to `subscribe` and get the current value back on every change — `hit` and `miss` never wake one. A tag subscription attributes `delete`, `evict`, `expire`, `invalidate`, `prune` and `clear` to the tags they actually hit through a per-tag mirror, `{ once: true }` fires once, a throwing subscriber is logged and skipped, and with no subscription alive the layer does not exist: the hot path is untouched.", href: "#events", more: "Events", commits: ["de3bfa6", "1f90404", "e6e2941"] },
+    { kind: "new", title: "New package: `@blaze-cache/ofetch`", desc: "The same cache for ofetch / `$fetch` — the HTTP client behind Nuxt and Nitro. `blazeOfetch(instance, cache, options)` wraps an instance you already have, `createBlazeOfetch(cache, options)` builds one with ofetch defaults and cache options in a single bag, and the wrapped instance keeps the full ofetch API: parsed data, `.raw()` with the `x-blaze-cache` marker, `.native`, and `.create()`.", href: "#ofetch", more: "Ofetch Adapter", commits: ["134fb68", "431fa62"] },
+    { kind: "new", title: "Wasm loading, standardized", desc: "`createCache` now takes one explicit source — `wasmUrl`, a precompiled `module`, or an `instantiate` loader (plus the low-level `wasm` passthrough) — instead of a single overloaded option. The default still resolves the shipped binary relative to the package, concurrent creates share one download and compile, two sources at once throw a `TypeError`, and every failure says what to try next: the HTTP status and URL, the fetch error kept on `cause`, or the compile failure.", href: "#wasm", more: "Wasm Loading", commits: ["faab6af", "2be828c", "41e6292"] },
+    { kind: "new", title: "Per-request controls on axios and fetch", desc: "Pass `blazeCache` on any axios request config or fetch init to override `enabled`, `ttlMs`, `tags`, `key`, `varyHeaders` and `forceRefresh` for that one call — `blazeCache: false` bypasses the cache entirely, `invalidateTags` purges after a mutation, and `invalidateCacheTags(cache, ...tags)` is the standalone helper. On fetch, `forceRefresh` (or `cache: 'reload'`) skips the read and rewrites the entry, so the next request is a HIT again.", href: "#axios", more: "Axios Adapter", commits: ["414af74", "462e5f7", "e9361ad"] },
+    { kind: "new", title: "SWR: `forceRefresh`, tag resolvers, scoped invalidation", desc: "A call-site `forceRefresh` skips the persisted seed but keeps the write — the next mount starts from it — `tags` accepts a resolver run at write time from the key and data, a cache that throws costs a console warning instead of a broken hook, and `invalidateBlazeSWR(cache, ...tags)` purges only this package's envelopes: a neighbour integration's entry wearing the same tag survives.", href: "#swr", more: "SWR", commits: ["ccd41c6", "9f72607", "7f30570", "67480c4"] },
+    { kind: "fixed", title: "Raw wasm key methods no longer trust host pointers", desc: "`getRaw` / `setRaw` / `deleteRaw` used to build a `&str` from an arbitrary JS-supplied pointer and length with `from_utf8_unchecked`. They now validate the pointer against the current buffer, bound the length and check UTF-8, degrading to a miss, a no-op or `false` instead of undefined behaviour. Both crates are free of `unsafe` code and release panics abort.", href: "#wasm", more: "Wasm Loading", commits: ["e6ea3f8", "1c74258"] },
+    { kind: "perf", title: "Common writes stop allocating; huge capacities stay cheap", desc: "Tag ids live inline for the usual zero-to-two tags, and the wasm `set` / `setMany` paths look keys up by slice instead of cloning them on overwrite. `Cache::new` reserves at most 1024 index buckets rather than the whole declared capacity — a million-slot declaration used to cost ~69 MB before the first insert, and now stays under 1 MB — while still growing on demand up to the logical ceiling.", href: "#core", more: "Core API", commits: ["0a2b98f", "fa61bf9", "f2a293e"] },
+    { kind: "fixed", title: "Supply-chain gates", desc: "CI pins every third-party action to a commit SHA, verifies the wasm-pack tarball against a pinned sha256 before extracting it, and runs gitleaks, `pnpm audit` and `cargo audit` on push, PR and nightly — with Dependabot re-pinning the SHAs. `follow-redirects` is overridden to a patched range for CVE-2026-116689.", href: "#repo", more: "Repo & Development", commits: ["2518b33", "34c00c8"] },
+    { kind: "testing", title: "600 automated checks, all green", desc: "Every claim above is backed by the suite: 479 offline package and integration tests, 27 benchmark-suite checks, 57 Rust engine tests, 5 allocation tests, 4 doctests and 28 wasm-binding tests. The allocation tests assert that overwrites, byte-region reuse and by-id lookups stay allocation-free; the live network suites remain opt-in.", href: "#repo", more: "Repo & Development", commits: ["7cf1079", "4f703c2", "85ec3e0", "ce00c07"] },
+  ],
+  nav: NAV_040,
+  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS, ...STORAGE_METHODS],
+  commands: COMMANDS_040, examples: EXAMPLES_CURRENT, layout: LAYOUT_040,
+};
+
+// The previous stable line, archived at /0.3.0 after 0.4.0 became current. Kept as it
+// shipped: untagged installs, the 0.3 What's New set and no 0.4-only sections.
+const PREVIOUS_RELEASE: Release = {
+  id: "previous", version: "0.3.0", badge: "v0.3.0", legacy: false, prerelease: false, isNew: false, installTag: "",
   metaDescription: "A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly. Synchronous reads, a drop-in fetch() replacement, axios, ky and SWR adapters, and TanStack Query integration.",
   tests: { total: 350, detail: "286 JS · 43 Rust engine · 4 doctests · 17 wasm" },
   packages: [
@@ -228,59 +306,12 @@ const CURRENT_RELEASE: Release = {
   commands: COMMANDS_CURRENT, examples: EXAMPLES_CURRENT, layout: LAYOUT,
 };
 
-// The 0.4.0-beta prerelease: published on npm under the `beta` dist-tag, so every install
-// command below carries `@beta` — leaving the tag off installs the last stable release.
-const BETA_RELEASE: Release = {
-  id: "beta", version: "0.4.0-beta", badge: "v0.4.0-beta", legacy: false, prerelease: true, installTag: "@beta",
-  metaDescription: "Blaze Cache 0.4.0-beta prerelease documentation: hardened IndexedDB persistence with session rotation and a flush/clear/hydrate/stats/rotate control API, value subscriptions, standardized wasm loading, and the new @blaze-cache/ofetch adapter.",
-  tests: { total: 584, detail: "507 JS · 49 Rust engine · 3 allocation · 4 doctests · 21 wasm" },
-  packages: [
-    { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
-    { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
-    { pkg: "@blaze-cache/fetch", note: "Drop-in fetch() with HTTP caching", peers: "None" },
-    { pkg: "@blaze-cache/ky", note: "ky HTTP adapter (ky v1 & v2)", peers: "ky >= 1.14 || 2" },
-    { pkg: "@blaze-cache/ofetch", note: "ofetch / $fetch HTTP adapter (Nuxt & Nitro)", peers: "ofetch >= 1.0" },
-    { pkg: "@blaze-cache/react-query", note: "TanStack Query v5 integration", peers: "@tanstack/react-query >= 5.0.0" },
-    { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
-  ],
-  quickStart: [
-    "# core is the only package you must install", "npm install @blaze-cache/core@beta", "",
-    "# then only the integrations you use",
-    "npm install @blaze-cache/axios@beta",
-    "npm install @blaze-cache/fetch@beta",
-    "npm install @blaze-cache/ky@beta",
-    "npm install @blaze-cache/ofetch@beta",
-    "npm install @blaze-cache/react-query@beta",
-    "npm install @blaze-cache/swr@beta", "",
-    "# peers — only for the adapters above", "npm install axios", "npm install ky", "npm install ofetch", "npm install @tanstack/react-query", "",
-    "# optional: SWR config", "npm install swr",
-  ],
-  whatsNew: [
-    { kind: "fixed", title: "Raw wasm key methods no longer trust host pointers", desc: "`getRaw` / `setRaw` / `deleteRaw` used to build a `&str` from an arbitrary JS-supplied pointer and length with `from_utf8_unchecked` — a pointer left stale after the scratch buffer reallocated, an oversized length or invalid UTF-8 could construct an invalid slice. They now validate the pointer against the current buffer, bound the length and check UTF-8, degrading to a miss, a no-op or `false` instead of undefined behaviour. The wasm crate is now free of `unsafe` code.", href: "#wasm", more: "Wasm Loading", commits: ["e6ea3f8", "1c74258"] },
-    { kind: "perf", title: "Common writes stop allocating; huge capacities stay cheap", desc: "Tag ids live inline for the usual zero-to-two tags, and the wasm `set` / `setMany` paths look keys up by slice instead of cloning them on overwrite. `Cache::new` reserves at most 1024 index buckets rather than the whole declared capacity — a million-slot declaration used to cost ~69 MB before the first insert, and now stays under 1 MB — while still growing on demand up to the logical ceiling.", href: "#core", more: "Core API", commits: ["0a2b98f", "fa61bf9", "f2a293e"] },
-    { kind: "testing", title: "Memory stress suite and wasm failure diagnostics", desc: "A randomized stress suite audits slab accounting, SIEVE links, the TTL counter, tag membership and the drop-log bound after every operation, with value-lifetime tracking that catches leaks and double-drops and a deliberately corrupted eviction cursor. The integration suites now report any wasm failure with the failing method and arguments, the full cause chain and a sha256 fingerprint of the binary actually loaded — so a stale build is obvious from the log alone.", href: "#repo", more: "Repo & Development", commits: ["5c98a41", "0ff44dd", "945c879"] },
-    { kind: "new", title: "Persistence, hardened: sessions, schema and a control API", desc: "`cache.persistence` is a full control surface now — `flush()`, `clear()`, `hydrate()`, `stats()` and `rotate()` — over an adapter that folds a rotatable session generation into the key space: rotation drops every queued write and every flush still in flight, so a late save can no longer repopulate the next login's rows. Rows carry a schema stamp — storage written by a newer schema resets the namespace loudly instead of being misread, a corrupt row costs exactly itself — the options gain `namespace`, `debounceMs`, `maxEntries`, `restoreExpired`, `writeMode`, `onError` and `onActivity` (the old spellings remain as aliases), and each flush reaches storage as one batched transaction on a single reused connection.", href: "#persistence", more: "Persistence", commits: ["994c4ae", "a77cb59", "c14740e"] },
-    { kind: "new", title: "Value subscriptions: `subscribe`, `subscribeMany`, `subscribeTag`", desc: "Hand a key, a list of keys or a tag to `subscribe` and get the current value back on every change — `hit` and `miss` never wake one. A tag subscription attributes `delete`, `evict`, `expire`, `invalidate`, `prune` and `clear` to the tags they actually hit through a per-tag mirror, `{ once: true }` fires once, a throwing subscriber is logged and skipped, and with no subscription alive the layer does not exist: the hot path is untouched.", href: "#events", more: "Events", commits: ["de3bfa6", "1f90404", "e6e2941"] },
-    { kind: "new", title: "New package: `@blaze-cache/ofetch`", desc: "The same cache for ofetch / `$fetch` — the HTTP client behind Nuxt and Nitro. `blazeOfetch(instance, cache, options)` wraps an instance you already have, `createBlazeOfetch(cache, options)` builds one with ofetch defaults and cache options in a single bag, and the wrapped instance keeps the full ofetch API: parsed data, `.raw()` with the `x-blaze-cache` marker, `.native`, and `.create()`.", href: "#ofetch", more: "Ofetch Adapter", commits: ["134fb68", "431fa62"] },
-    { kind: "new", title: "Wasm loading, standardized", desc: "`createCache` now takes one explicit source — `wasmUrl`, a precompiled `module`, or an `instantiate` loader (plus the low-level `wasm` passthrough) — instead of a single overloaded option. The default still resolves the shipped binary relative to the package, concurrent creates share one download and compile, two sources at once throw a `TypeError`, and every failure says what to try next: the HTTP status and URL, the fetch error kept on `cause`, or the compile failure.", href: "#wasm", more: "Wasm Loading", commits: ["faab6af", "2be828c", "41e6292"] },
-    { kind: "new", title: "Per-request controls on axios and fetch", desc: "Pass `blazeCache` on any axios request config or fetch init to override `enabled`, `ttlMs`, `tags`, `key`, `varyHeaders` and `forceRefresh` for that one call — `blazeCache: false` bypasses the cache entirely, `invalidateTags` purges after a mutation, and `invalidateCacheTags(cache, ...tags)` is the standalone helper. On fetch, `forceRefresh` (or `cache: 'reload'`) skips the read and rewrites the entry, so the next request is a HIT again.", href: "#axios", more: "Axios Adapter", commits: ["414af74", "462e5f7", "e9361ad"] },
-    { kind: "new", title: "SWR: `forceRefresh`, tag resolvers, scoped invalidation", desc: "A call-site `forceRefresh` skips the persisted seed but keeps the write — the next mount starts from it — `tags` accepts a resolver run at write time from the key and data, a cache that throws costs a console warning instead of a broken hook, and `invalidateBlazeSWR(cache, ...tags)` purges only this package's envelopes: a neighbour integration's entry wearing the same tag survives.", href: "#swr", more: "SWR", commits: ["ccd41c6", "9f72607", "7f30570", "67480c4"] },
-    { kind: "fixed", title: "Request bodies join the cache key", desc: "An opted-in non-GET with two different payloads to one URL used to share a single entry and replay the first response for the second. The default key now folds the body in across axios, ky, ofetch and fetch — objects serialize injectively, `URLSearchParams` keep their order, `FormData` parts are sorted — and a body no encoder can read leaves that request uncached rather than guessed at, unless an explicit `key` describes it.", href: "#axios", more: "Axios Adapter", commits: ["47366c4"] },
-    { kind: "fixed", title: "Tags survive a capacity sweep", desc: "A tagged write that forced an eviction could lose its own tags: the slot was reclaimed before the tag id was interned, and the reused slot wore none. Tag ids are now interned after the sweep, so a write evicting its way into a full cache keeps its tags — with a regression test that forces exactly that eviction.", href: "#core", more: "Core API", commits: ["ea683c2", "a343ace"] },
-    { kind: "fixed", title: "ofetch: `.create()` defaults and origins", desc: "Defaults passed to `ofetch.create()` now apply to both the request and the cache key — an instance's own `baseURL`, hidden in a closure, is learned from the first response instead of being invisible to the key — and two different origins can no longer share one cache entry.", href: "#ofetch", more: "Ofetch Adapter", commits: ["01bb1c5", "37cac43"] },
-    { kind: "testing", title: "Persistence tested against real IndexedDB", desc: "The new suite runs 25 tests through `fake-indexeddb` against the shipped adapter: hydrate restores valid records, expired ones stay down when `restoreExpired` is off, a corrupt row costs only itself, a rotation blocks a stale in-flight write, `flush`/`clear`/`hydrate` behave, and namespaces stay isolated. The wasm loader and the subscription layer gained their own suites too.", href: "#repo", more: "Repo & Development", commits: ["a77cb59", "2be828c", "1f90404"] },
-    { kind: "fixed", title: "Supply-chain gates", desc: "CI pins every third-party action to a commit SHA, verifies the wasm-pack tarball against a pinned sha256 before extracting it, and runs gitleaks, `pnpm audit` and `cargo audit` on push, PR and nightly — with Dependabot re-pinning the SHAs. `follow-redirects` is overridden to a patched range for CVE-2026-116689.", href: "#repo", more: "Repo & Development", commits: ["2518b33", "34c00c8"] },
-  ],
-  nav: NAV_BETA,
-  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS],
-  commands: COMMANDS_CURRENT, examples: EXAMPLES_CURRENT, layout: LAYOUT_BETA,
-};
 
 export const RELEASES: Record<ReleaseId, Release> = {
   stable: CURRENT_RELEASE,
-  beta: BETA_RELEASE,
+  previous: PREVIOUS_RELEASE,
   legacy: {
-    id: "legacy", version: "0.2.5", badge: "v0.2.5", legacy: true, prerelease: false, installTag: "",
+    id: "legacy", version: "0.2.5", badge: "v0.2.5", legacy: true, prerelease: false, isNew: false, installTag: "",
     metaDescription: "Documentation for Blaze Cache 0.2.5, an archived release: TTLs, tags, SIEVE eviction, IndexedDB persistence, and the axios, fetch, TanStack Query and SWR integrations.",
     tests: { total: 175, detail: "119 JS · 41 Rust engine · 3 doctests · 12 wasm" },
     packages: [

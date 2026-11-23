@@ -38,7 +38,7 @@ const KIND_CLS: Record<string, string> = {
 const COMMIT_BASE = "https://github.com/blaze-cache/blaze-cache/commit/"
 
 /** Version chip used in the header and the mobile drawer; the current route renders active. */
-function VersionLink({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
+function VersionLink({ to, active, children, isNew }: { to: string; active: boolean; children: ReactNode; isNew?: boolean }) {
   return (
     <Link
       to={to}
@@ -47,31 +47,34 @@ function VersionLink({ to, active, children }: { to: string; active: boolean; ch
       }`}
     >
       {children}
+      {isNew && <span className="ml-1 rounded bg-flame/15 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-flame">new</span>}
     </Link>
   )
 }
 
 /** Sidebar group heading for a nav id — '' when the item belongs to no group. */
 function navGroup(id: string): string {
-  if (id === "core" || id === "persistence" || id === "wasm") return "Core"
-  if (id === "rq" || id === "swr" || id === "axios" || id === "fetch" || id === "ky" || id === "ofetch") return "Adapters"
+  if (["core", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
+  if (["rq", "swr", "axios", "fetch", "ky", "ofetch"].includes(id)) return "Adapters"
   if (id === "usage") return "Usage"
-  if (id === "examples" || id === "repo") return "Repo"
+  if (["benchmarks", "examples", "repo"].includes(id)) return "Repo"
   return ""
 }
 
 export default function DocsPage({ release: releaseId }: { release: ReleaseId }) {
   const release = RELEASES[releaseId]
-  // Every release except the archived 0.2.5 docs renders the 0.3.0-line content…
+  // Both 0.4.0 and the archived 0.3.0 line render the modern adapter/API content.
   const isCurrent = !release.legacy
-  // …and only the prerelease stacks the 0.4.0 additions on top of it.
-  const isBeta = release.prerelease
+  // Only the current stable line carries what 0.4 added: persistence, wasm loading,
+  // storage modes, multi-tab sync, benchmarks and the ofetch adapter.
+  const has040 = release.id === "stable"
+  // Anything but the latest stable renders an archive banner.
+  const isArchived = releaseId !== "stable"
   const navItems = release.nav
   const quickStart = release.quickStart.join("\n")
-  // The core example doubles as the wasm-loading story: the 0.4 line points at one
-  // explicit source (or none — the shipped binary is the default), the 0.3 line at the
-  // low-level `wasm` passthrough.
-  const coreExample = isBeta
+  // The core example doubles as the wasm-loading story: 0.4 points at one explicit
+  // source (or none — the shipped binary is the default), 0.3 at the low-level `wasm`.
+  const coreExample = has040
     ? `import { createCache } from '@blaze-cache/core';
 
 const cache = await createCache({
@@ -87,7 +90,7 @@ const cache = await createCache({
   persistence: { namespace: 'my-app' },
   wasm: wasmUrl,
 });`
-  // Beta-only example blocks — each string lives once and feeds both the <pre> and its
+  // 0.4-only example blocks — each string lives once and feeds both the <pre> and its
   // copy button.
   const persistenceExample = `const cache = await createCache({
   persistence: {
@@ -161,6 +164,40 @@ const api = createBlazeOfetch(cache, {
 });
 
 const users = await api('/users');`
+  const bytesExample = `import { createCache } from '@blaze-cache/core';
+
+const cache = await createCache({ capacity: 1000 });
+
+// raw bytes: one copy into Wasm linear memory, zero-copy reads
+cache.setBytes('image', new Uint8Array(buffer), { ttlMs: 30_000 });
+const view = cache.getBytes('image');        // Uint8Array view onto Wasm memory
+const snapshot = cache.getBytesCopy('image'); // owned — keep this one
+// set()/get() still work on the same cache, unchanged.
+
+// advanced: a decoder already wrote the region — adopt it without another copy
+// const ptr = wasmCache.bytesReserve(len); /* …write through wasmLinearMemory()… */
+// cache.setBytesReserved('frame', ptr, len);`
+  const hybridExample = `// values live in a JS Map; Wasm keeps keys, TTL, tags and stable ids
+const cache = await createCache({ capacity: 1000, storage: 'js' });
+
+cache.set('user:42', user, { tags: ['user'] }); // the same reference stays in JS
+cache.get('user:42');                          // Wasm hit by id, then Map.get
+// events, tag invalidation, entries(), stats and persistence behave identically`
+  const multiTabExample = `// opt in — without it no channel is opened and nothing changes
+const cache = await createCache({
+  capacity: 1000,
+  persistence: { namespace: 'app' },
+  multiTab: { enabled: true, strategy: 'value' },
+});
+
+cache.on('remote-set', ({ key }) => console.log('another tab wrote', key));
+// strategy: 'value'    structured-clone payloads (fallback: invalidate tombstone)
+// strategy: 'invalidate'  send tombstones only — the app refetches on focus`
+  const benchmarkExample = `pnpm bench            # Node: 10 scenarios × 5 payload sizes × 2 kinds
+pnpm bench:browser    # the identical suite in headless Chrome
+pnpm bench:framework  # TanStack Query / SWR cache-store point operations
+pnpm bench:ci         # --quick run + 20% regression gate
+# raw JSON and the full methodology: docs/benchmarks/RESULTS.md`
 
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeId, setActiveId] = useState("overview")
@@ -170,12 +207,10 @@ const users = await api('/users');`
     // the social tags are rewritten here for whichever release the URL selected — the
     // crawlers that render JS see per-page metadata, the rest fall back to index.html.
     const r = RELEASES[releaseId]
-    const title = r.prerelease
-      ? `Blaze Cache ${r.version} (prerelease) — Docs`
-      : r.legacy
-        ? `Blaze Cache ${r.version} (archive) — Docs`
-        : "Blaze Cache — Full-Featured Client-Side Cache"
-    const routePath = releaseId === "stable" ? "/" : releaseId === "beta" ? "/beta" : "/0.2.5"
+    const title = isArchived
+      ? `Blaze Cache ${r.version} (archive) — Docs`
+      : "Blaze Cache 0.4.0 — Full-Featured Client-Side Cache"
+    const routePath = releaseId === "stable" ? "/" : releaseId === "previous" ? "/0.3.0" : "/0.2.5"
     const canonical = `https://blaze-cache.github.io${import.meta.env.BASE_URL.replace(/\/+$/, "")}${routePath}`
     const setMeta = (selector: string, attr: "content" | "href", value: string) => {
       document.querySelector(selector)?.setAttribute(attr, value)
@@ -194,7 +229,7 @@ const users = await api('/users');`
 
     // Switching versions rewrites the URL without a reload — keep deep links where they are.
     if (!window.location.hash) window.scrollTo({ top: 0 })
-  }, [releaseId])
+  }, [releaseId, isArchived])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -221,13 +256,14 @@ const users = await api('/users');`
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold tracking-tight leading-none">Blaze Cache</h1>
             <Badge>{release.badge}</Badge>
+            {release.isNew && <Badge variant="outline" className="border-primary text-flame">new</Badge>}
           </div>
-          {/* Version switcher — the beta tracks npm's `beta` tag, stable its `latest`,
-              and the archive keeps the 0.2 line readable. Labels come from the release
-              record, so a version bump happens in exactly one place. */}
+          {/* Version switcher — stable tracks npm's `latest` tag; the two older lines
+              are archived routes. Labels come from the release record, so a version
+              bump happens in exactly one place. */}
           <nav aria-label="Documentation version" className="hidden items-center gap-1 rounded-lg border border-border bg-card p-0.5 px-3 lg:flex">
-            <VersionLink to="/beta" active={releaseId === "beta"}>{RELEASES.beta.badge}</VersionLink>
-            <VersionLink to="/" active={releaseId === "stable"}>{RELEASES.stable.badge}</VersionLink>
+            <VersionLink to="/" active={releaseId === "stable"} isNew>{RELEASES.stable.badge}</VersionLink>
+            <VersionLink to="/0.3.0" active={releaseId === "previous"}>{RELEASES.previous.badge}</VersionLink>
             <VersionLink to="/0.2.5" active={releaseId === "legacy"}>{RELEASES.legacy.badge}</VersionLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
@@ -260,8 +296,8 @@ const users = await api('/users');`
             <div className="mt-6 border-t border-border pt-5">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Docs version</p>
               <div className="flex flex-wrap gap-2 px-1">
-                <VersionLink to="/beta" active={releaseId === "beta"}>{RELEASES.beta.badge}</VersionLink>
-                <VersionLink to="/" active={releaseId === "stable"}>{RELEASES.stable.badge}</VersionLink>
+                <VersionLink to="/" active={releaseId === "stable"} isNew>{RELEASES.stable.badge}</VersionLink>
+                <VersionLink to="/0.3.0" active={releaseId === "previous"}>{RELEASES.previous.badge}</VersionLink>
                 <VersionLink to="/0.2.5" active={releaseId === "legacy"}>{RELEASES.legacy.badge}</VersionLink>
               </div>
             </div>
@@ -274,7 +310,7 @@ const users = await api('/users');`
 
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-16">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[260px_1fr]">
-          {/* Sidebar — sticky and vertically scrollable: the beta route lists 17
+          {/* Sidebar — sticky and vertically scrollable: the 0.4 route lists 22
               sections, which can exceed a short viewport. The scrollbar itself is
               hidden (still wheel/trackpad/keyboard scrollable). */}
           <aside className="hidden lg:block">
@@ -309,22 +345,18 @@ const users = await api('/users');`
 
           <main className="min-w-0">
             {/* Which release these docs describe */}
-            {release.prerelease ? (
-              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-600/50 bg-card px-5 py-4 text-sm text-muted-foreground">
-                <Badge variant="outline" className="border-amber-600/60 text-amber-700 dark:text-amber-300">beta</Badge>
-                <span>These docs describe <strong>{release.badge}</strong>, a prerelease — install it with <code className="font-mono text-foreground">{release.installTag}</code>, or leave the tag off for the stable release.</span>
-                <Link to="/" className="font-medium text-flame underline underline-offset-4 hover:text-foreground">Stable docs are {RELEASES.stable.badge} →</Link>
-              </div>
-            ) : isCurrent ? (
-              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
-                <Badge variant="outline">stable</Badge>
-                <span>Documenting release <strong>{release.badge}</strong>.</span>
-              </div>
-            ) : (
+            {isArchived ? (
               <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
                 <Badge variant="outline">archive</Badge>
                 <span>These docs describe <strong>{release.badge}</strong>, an earlier release.</span>
                 <Link to="/" className="font-medium text-flame underline underline-offset-4 hover:text-foreground">Current docs are {RELEASES.stable.badge} →</Link>
+              </div>
+            ) : (
+              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-primary/40 bg-card px-5 py-4 text-sm text-muted-foreground">
+                <Badge variant="outline">stable</Badge>
+                <Badge variant="outline" className="border-primary text-flame">new</Badge>
+                <span>Documenting the latest release, <strong className="text-foreground">{release.badge}</strong> — published benchmarks, opt-in memory modes, multi-tab sync and a faster write path.</span>
+                <a href="#whatsnew" className="font-medium text-flame underline underline-offset-4 hover:text-foreground">See what's new →</a>
               </div>
             )}
 
@@ -583,7 +615,7 @@ offEvict();           // …or just this one handle (idempotent)`} />
                     <code>dispose()</code> clears every listener along with the wasm memory.
                   </p>
 
-                  {isBeta && (
+                  {has040 && (
                     <div className="mt-8 space-y-6">
                       <Card className="border-border bg-card overflow-hidden">
                         <CardHeader className="border-b border-border">
@@ -641,8 +673,8 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                 <Separator className="my-16 bg-border" />
               </>
 
-            {/* Persistence + wasm loading — the 0.4 beta's own sections */}
-            {isBeta && (
+            {/* Persistence, wasm loading, storage, multi-tab and benchmarks — the 0.4 line's own sections */}
+            {has040 && (
               <>
                 <section id="persistence" className="mb-20 scroll-mt-28">
                   <div className="flex items-center gap-3 mb-6">
@@ -780,13 +812,11 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
 
                   <p className="mt-6 max-w-3xl text-muted-foreground">
                     <strong className="text-foreground">Multiple tabs</strong> share one IndexedDB
-                    namespace but nothing else: each holds its own wasm instance, hydrated once at
-                    startup, and each flushes the keys it wrote. Writes are{" "}
-                    <strong className="text-foreground">last-writer-wins per key</strong> — right for
-                    ordinary use (the foreground tab refetches on focus), but a hidden tab can flush
-                    a value older than the one the focused tab just wrote. If it matters, keep{" "}
-                    <code>ttlMs</code> short on records written from background tabs, or filter on a
-                    timestamp stored inside the value.
+                    namespace, and each still holds its own wasm instance — but they no longer have
+                    to disagree. Opt in to <a href="#multitab" className="text-flame underline underline-offset-4">multi-tab sync</a>{" "}
+                    to order writes across tabs and keep a hidden tab from flushing a stale value
+                    over the focused tab's newer one. Without the option the old last-writer-wins
+                    behavior is unchanged.
                   </p>
                 </section>
 
@@ -844,6 +874,202 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                 </section>
 
                 <Separator className="my-16 bg-border" />
+
+                <section id="storage" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Database size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Storage &amp; Memory</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    By default values stay <strong className="text-foreground">by reference</strong> in
+                    the Rust slab — <code>get</code>/<code>set</code> never clone or serialise them.
+                    Two opt-in modes change ownership for workloads that need it; neither is the
+                    default, and both were measured before shipping.
+                  </p>
+                  <div className="grid grid-cols-1 gap-6">
+                    <Card className="border-border bg-card overflow-hidden">
+                      <CardHeader className="border-b border-border">
+                        <CardTitle className="font-mono text-sm text-flame">Binary values — zero-copy reads</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-6 relative">
+                        <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{bytesExample}</code></pre><CopyButton text={bytesExample} />
+                      </CardContent>
+                    </Card>
+                    <Card className="border-border bg-card overflow-hidden">
+                      <CardHeader className="border-b border-border">
+                        <CardTitle className="font-mono text-sm text-flame">JS-authoritative hybrid mode</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-6 relative">
+                        <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{hybridExample}</code></pre><CopyButton text={hybridExample} />
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "storage", sig: "'wasm' | 'js'", desc: "Defaults to 'wasm' — values are externrefs in the slab. 'js' moves values into a JS Map<id, V> while Wasm keeps keys, TTL, tags, SIEVE bookkeeping and stable ids." },
+                      { name: "setBytes", sig: "(key, view, options?) => void", desc: "Copies raw bytes once into a chunked linear-memory arena. Views detach on memory.grow or region reuse — use getBytesCopy for anything long-lived." },
+                      { name: "getBytes", sig: "(key) => Uint8Array | undefined", desc: "A zero-copy view onto the region. entries()/entry() and persistence see a copied Uint8Array so those paths stay structured-cloneable." },
+                      { name: "setBytesReserved", sig: "(key, ptr, len, options?) => void", desc: "Advanced: a decoder that already wrote into the arena adopts the region with no JS→Wasm copy. The public setBytes contract is unchanged." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Both modes are capabilities, not speed stories: the published deltas show{" "}
+                    <code>storage: 'js'</code> slower than the default on every measured workload
+                    (the key scratch buffer already removed the cost it targeted), and bytes mode
+                    trades a copy on write for a view on read. <code>setBytes</code> is unavailable
+                    with <code>storage: 'js'</code> and throws a clear error. See{" "}
+                    <a href="#benchmarks" className="text-flame underline underline-offset-4">Benchmarks</a>.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+
+                <section id="multitab" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Radio size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Multi-Tab Sync</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    The old "no coordination between tabs" limitation is gone. Opt in and each
+                    namespace opens one <code>BroadcastChannel</code> keyed by namespace and session
+                    generation; <code>set</code>, <code>delete</code>, <code>clear</code>, tag
+                    invalidation and rotation propagate between instances, with a{" "}
+                    <code>hello</code>/<code>state</code> handshake on focus so a tab that was asleep
+                    can catch up.
+                  </p>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">multiTab: &#123; enabled: true, strategy: 'value' &#125;</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{multiTabExample}</code></pre><CopyButton text={multiTabExample} />
+                    </CardContent>
+                  </Card>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "strategy", sig: "'value' | 'invalidate'", desc: "'value' (default) structured-clones payloads over the channel, falling back to an invalidate tombstone for non-cloneable values. 'invalidate' only sends tombstones for apps that refetch on focus." },
+                      { name: "ordering", sig: "HLC + seq + clientId", desc: "A hybrid logical clock, a per-client sequence and a deterministic client-id tiebreaker order writes. Each key remembers the last version it saw, so a late stale message never wins — the hidden-tab flush bug is fixed." },
+                      { name: "remote events", sig: "remote-*", desc: "Remote changes fire remote-set / remote-delete / remote-clear / remote-invalidate / remote-rotate. They are applied through an internal path that bypasses publishing, so there are no echo storms and no duplicate flush." },
+                      { name: "lifecycle", sig: "Web Lock · dispose", desc: "A Web Lock serialises IndexedDB flushes across tabs where available. The channel closes on dispose; where BroadcastChannel is missing (workers, older browsers) the layer degrades silently with no channel opened." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    The option is off by default: without <code>multiTab.enabled</code> no channel is
+                    created, no version state is kept and the hot path is byte-for-byte what it was.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+
+                <section id="benchmarks" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Zap size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Benchmarks</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    Ten scenarios — fill, hit, miss, mixed, the <code>full-featured</code> headline,
+                    TTL churn, eviction pressure, tag invalidation, persistence flush and hydration —
+                    across five payload sizes (≤64 B → 1 MB) and both structured-cloneable objects
+                    and <code>Uint8Array</code>, in Node <em className="text-foreground not-italic font-medium">and</em>{" "}
+                    headless Chrome. Every adapter must produce deeply equal probe observations
+                    before timing starts; the reported number is a calibrated median with its spread.
+                    A separate <code>bench:framework</code> suite compares point operations against
+                    the real TanStack Query and SWR cache stores.
+                  </p>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <CardTitle className="font-mono text-sm text-flame">full-featured, small payload — ns/op, lower is better</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <table className="w-full text-sm text-muted-foreground">
+                        <thead><tr className="border-b border-border text-left"><th className="py-2">Adapter</th><th className="py-2 text-right">Node / object</th><th className="py-2 text-right">Browser / object</th></tr></thead>
+                        <tbody className="divide-y divide-border">
+                          <tr><td className="py-2">Map + LRU + TTL + tags</td><td className="py-2 text-right font-mono">211.2</td><td className="py-2 text-right font-mono">190.3</td></tr>
+                          <tr><td className="py-2">QuickLRU + tag index</td><td className="py-2 text-right font-mono text-emerald-600 dark:text-emerald-300">109.3</td><td className="py-2 text-right font-mono text-emerald-600 dark:text-emerald-300">88.2</td></tr>
+                          <tr><td className="py-2">lru-cache + tag index</td><td className="py-2 text-right font-mono">231.3</td><td className="py-2 text-right font-mono">100.0</td></tr>
+                          <tr><td className="py-2 font-semibold text-foreground">blaze-cache</td><td className="py-2 text-right font-mono font-semibold text-foreground">183.6</td><td className="py-2 text-right font-mono font-semibold text-foreground">208.6</td></tr>
+                        </tbody>
+                      </table>
+                      <p className="mt-4 text-xs text-muted-foreground">
+                        Feature-equivalent (mixed 90/10, no TTL or tags): blaze 119.3 Node / 113.4
+                        browser versus QuickLRU 73.9 / 66.2 and plain Map 52.6 / 42.7 — the comparison
+                        that matters when you do not need the features.
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card className="border-border bg-card">
+                      <CardHeader><CardTitle className="text-base">No payload-size cliff</CardTitle></CardHeader>
+                      <CardContent className="space-y-2 text-sm text-muted-foreground">
+                        <p>A 16 000× increase from tiny to 1 MB moves a hot read by roughly 10–20 ns and a full-featured operation by 10–25 ns — inside the suite's spread. Values are held by reference, never serialised on the hot path.</p>
+                        <p className="font-mono text-xs">get-hit: 93 → 108 ns (Node), 86 → 90 ns (browser)<br />full-featured: 169 → 191 ns (Node), 184 → 193 ns (browser)</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-border bg-card">
+                      <CardHeader><CardTitle className="text-base">Stage 4: write-path tuning</CardTitle></CardHeader>
+                      <CardContent className="space-y-2 text-sm text-muted-foreground">
+                        <p className="font-mono text-xs">full-featured: 175.3 → 171.4 ns Node (−2%)<br />full-featured: 190.1 → 182.8 ns browser (−4%)<br />fill: flat/slightly slower · get-hit: unchanged</p>
+                        <p>Tagged raw-key writes removed per-set key and tag allocations. The write-path premium against native LRU peers is real but small in absolute terms.</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className="mt-6 border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <CardTitle className="font-mono text-sm text-flame">Framework cache stores — Node, ns/op (1 KB, capacity 10 000)</CardTitle>
+                      <CardDescription className="text-xs">pnpm bench:framework — point operations of the real TanStack Query and SWR stores.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <table className="w-full text-sm text-muted-foreground">
+                        <thead><tr className="border-b border-border text-left"><th className="py-2">Scenario</th><th className="py-2 text-right">Blaze</th><th className="py-2 text-right">TanStack Query</th><th className="py-2 text-right">SWR</th></tr></thead>
+                        <tbody className="divide-y divide-border">
+                          <tr><td className="py-2 font-mono text-xs">warm-hit</td><td className="py-2 text-right font-mono font-semibold text-foreground">40.5</td><td className="py-2 text-right font-mono">518.7</td><td className="py-2 text-right font-mono">11.9</td></tr>
+                          <tr><td className="py-2 font-mono text-xs">miss</td><td className="py-2 text-right font-mono font-semibold text-foreground">28.2</td><td className="py-2 text-right font-mono">504.9</td><td className="py-2 text-right font-mono">11.6</td></tr>
+                          <tr><td className="py-2 font-mono text-xs">write</td><td className="py-2 text-right font-mono font-semibold text-foreground">175.3</td><td className="py-2 text-right font-mono">1831.7</td><td className="py-2 text-right font-mono">130.8</td></tr>
+                          <tr><td className="py-2 font-mono text-xs">invalidate-by-key</td><td className="py-2 text-right font-mono font-semibold text-foreground">142.7</td><td className="py-2 text-right font-mono">1 427 377.4</td><td className="py-2 text-right font-mono">100.0</td></tr>
+                        </tbody>
+                      </table>
+                      <p className="mt-4 text-xs text-muted-foreground">
+                        These are different shapes of API doing different amounts of work — TanStack's
+                        numbers include query-key hashing and query-cache bookkeeping, and a real SWR
+                        app also pays key serialisation. This is <strong className="text-foreground">not</strong>{" "}
+                        the feature-equivalent table for the headline (that is the Map / QuickLRU /
+                        lru-cache comparison above); "faster than a framework cache store" is only a
+                        claim about the store's point operations.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    <strong className="text-foreground">The honest caveat:</strong> the cost under
+                    test is the boundary crossing and bookkeeping, not object copying — that premise
+                    was disproven. Blaze replaces a stack of application code at roughly the same
+                    cost, beats it on Node reads, and pays a write-path premium against native LRU
+                    libraries. There is no unqualified "faster than JavaScript" claim. Full
+                    methodology, hardware, raw JSON and stage-by-stage deltas live in the repo's{" "}
+                    <a href="https://github.com/blaze-cache/blaze-cache/blob/main/docs/benchmarks/RESULTS.md" target="_blank" rel="noreferrer" className="text-flame underline underline-offset-4">published results</a>.
+                  </p>
+                  <div className="mt-6 rounded-xl border border-border bg-card p-6 relative">
+                    <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{benchmarkExample}</code></pre><CopyButton text={benchmarkExample} />
+                  </div>
+                </section>
+
+                <Separator className="my-16 bg-border" />
               </>
             )}
 
@@ -890,7 +1116,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                   </p>
                 </>
               )}
-              {isBeta && (
+              {has040 && (
                 <p className="mb-6 max-w-3xl text-muted-foreground">
                   This cycle added <strong className="text-foreground">per-request control</strong>:
                   pass <code>blazeCache</code> on any request config to override{" "}
@@ -1033,7 +1259,7 @@ const api = axios.create({
                       ignored rather than read as zero.
                     </p>
                   )}
-                  {isBeta && (
+                  {has040 && (
                     <p className="text-muted-foreground mb-6 max-w-3xl">
                       Per-request overrides land here too: <code>forceRefresh</code> (or the
                       standard <code>cache: 'reload'</code>) skips the read and rewrites the entry,
@@ -1138,7 +1364,7 @@ cache.invalidateTags('fetch');`} />
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Ky Adapter</h3>
-                    {!isBeta && <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>}
+                    {!has040 && <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>}
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     The <code className="text-flame">@blaze-cache/ky</code> package caches ky
@@ -1255,7 +1481,7 @@ const users = await api.get('users').json();`} />
                   </>
                 )}
 
-                {isBeta && (
+                {has040 && (
                   <section id="ofetch" className="mb-20 scroll-mt-28">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
@@ -1420,7 +1646,7 @@ const users = await api.get('users').json();`} />
                   you pass are the ones that stick.
                 </p>
               )}
-              {isBeta && (
+              {has040 && (
                 <p className="text-muted-foreground mb-6 max-w-3xl">
                   New in this release: a call-site <code>forceRefresh</code> skips the persisted
                   seed but keeps the write, so the next mount starts from it — pull-to-refresh
@@ -1495,7 +1721,7 @@ cache.on((event) => console.log(event.type));   // wildcard — every event` : `
 });`} />
                   </CardContent>
                 </Card>
-                {isBeta && (
+                {has040 && (
                   <Card className="border-border bg-card">
                     <CardHeader>
                       <CardTitle>Value subscriptions</CardTitle>
@@ -1551,7 +1777,7 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 IndexedDB, never inside the engine, which keeps no threads, no async and no
                 I/O.
               </p>
-              <ArchitectureDiagram beta={isBeta} />
+              <ArchitectureDiagram has040={has040} />
             </section>
 
             <Separator className="my-16 bg-border" />
@@ -1566,22 +1792,22 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 {[
                   { title: "Unpredictable JS eviction", desc: "LRU and WeakRef heuristics create object churn and non-deterministic cache hits. SIEVE offers a scan-resistant, O(1)-amortised algorithm with a tiny footprint." },
                   { title: "Async overhead on hot path", desc: "Standard caches return Promises for reads after initialization. Blaze Cache instantiates Wasm once during createCache(), so every get/set is fully synchronous." },
-                  { title: "No durable persistence", desc: isBeta
+                  { title: "No durable persistence", desc: has040
                     ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and cache.persistence puts flush/clear/hydrate/stats/rotate at your fingertips — with session generations isolating one login from the next and a schema stamp keeping reads safe across versions."
                     : isCurrent
                     ? "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, flushes trigger on pagehide / visibilitychange, and a flush that fails re-queues its records instead of dropping them."
                     : "Most browser caches are memory-only. The optional IndexedDB adapter hydrates before resolve, writes are debounced, and flushes trigger on pagehide / visibilitychange." },
                   { title: "Missing tag invalidation", desc: "Bulk removal by tag is rare in JS caches. Blaze Cache assigns monotonic tag IDs and performs invalidation via set difference — no full scan required." },
-                  ...(isBeta ? [
+                  ...(has040 ? [
                     { title: "Cross-session data bleed", desc: "After a logout/login, records restored from IndexedDB can belong to the previous account. Session generations keep each login in its own bucket — rotate() drops the old session's queued and in-flight writes instead of replaying them." },
-                    { title: "Multi-tab write races", desc: "Two tabs flushing the same namespace can disagree about a key. Rows carry a schema stamp and reconcile last-writer-wins per key, so one tab can never resurrect another's stale value." },
+                    { title: "Multi-tab write races", desc: "Two tabs can disagree about a key. Opt-in BroadcastChannel sync orders writes with a hybrid logical clock and a per-key version guard, so a hidden tab's stale flush can never overwrite a newer value; flushes are serialised with a Web Lock where available." },
                   ] : []),
-                  { title: "Fragmented integrations", desc: isBeta
+                  { title: "Fragmented integrations", desc: has040
                     ? "Axios, fetch(), ky, ofetch, TanStack Query and SWR each need their own caching solution. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence, subscriptions and stats model."
                     : isCurrent
                     ? "Axios, fetch(), ky, TanStack Query and SWR each need their own caching solution. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model."
                     : "Axios, fetch(), TanStack Query and SWR each need their own caching solution. Blaze provides a single core with first-class adapters for all of them, sharing the same persistence and stats model." },
-                  { title: "Bundler / asset complexity", desc: isBeta
+                  { title: "Bundler / asset complexity", desc: has040
                     ? "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core and resolves relative to its own URL — or you can point at an explicit wasmUrl, a precompiled module, or your own instantiate() loader."
                     : "Many Wasm libraries require separate binary downloads or CDN configuration. The .wasm binary ships inside @blaze-cache/core; the package resolves it relative to its own URL." },
                 ].map((p) => (
@@ -1604,7 +1830,7 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>One core, many adapters</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                  <CardContent><p className="text-sm text-muted-foreground">{has040
                     ? "A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, ky, ofetch, TanStack Query or SWR, the same persistence, subscriptions, stats and eviction model applies."
                     : isCurrent
                     ? "A single Rust / Wasm engine powers all integrations. Whether using axios, fetch, ky, TanStack Query or SWR, the same persistence, stats and eviction model applies."
@@ -1612,13 +1838,13 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 </Card>
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>Synchronous hot path</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                  <CardContent><p className="text-sm text-muted-foreground">{has040
                     ? "After initialization, every read and write is fully synchronous — no Promises on the hot path. The Wasm module loads once (from the shipped binary, or a source you name); the rest is pure TypeScript."
                     : "After initialization, every read and write is fully synchronous — no Promises on the hot path. The Wasm module loads once; the rest is pure JS."}</p></CardContent>
                 </Card>
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>Durable by default</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                  <CardContent><p className="text-sm text-muted-foreground">{has040
                     ? "Optional IndexedDB persistence hydrates before the first get, writes are debounced, and a failed flush re-queues instead of losing data. cache.persistence puts flush/clear/hydrate/stats/rotate in reach, and session generations keep one login apart from the next."
                     : isCurrent
                     ? "Optional IndexedDB persistence hydrates before the first get, writes are debounced, and flush recoveries mean a failed flush never loses data."
@@ -1626,7 +1852,7 @@ cache.touch('user:42', { ttlMs: 60_000 });  // renew the deadline, keep the valu
                 </Card>
                 <Card className="border-border bg-card">
                   <CardHeader><CardTitle>Observable and typed</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">{isBeta
+                  <CardContent><p className="text-sm text-muted-foreground">{has040
                     ? "Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload or to all events at once — and subscribe()/subscribeMany()/subscribeTag() hand you the value itself, not just the change. Nothing blocks mutations."
                     : "Every mutation emits a typed event. Listeners can subscribe to one event with a precise payload, or to all events at once — and they never block mutations."}</p></CardContent>
                 </Card>
