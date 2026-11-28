@@ -342,7 +342,7 @@ const BETA_RELEASE: Release = {
     { kind: "testing", title: "644 automated checks, all green", desc: "510 offline package and integration tests (17 of them the new devtools suite), 27 benchmark-suite checks, 67 Rust engine tests, 7 allocation tests — both indexes on and off — 4 doctests and 29 wasm-binding tests. The live network suites remain opt-in, and the same-runner A/B bench gate passed on the release commit.", href: "#repo", more: "Repo & Development", commits: ["1a1e7e0", "db35877"] },
   ],
   nav: NAV_BETA,
-  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS, ...STORAGE_METHODS, ...QUERY_METHODS],
+  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS.map((m) => ({ ...m, isNew: false })), ...STORAGE_METHODS.map((m) => ({ ...m, isNew: false })), ...QUERY_METHODS],
   commands: COMMANDS_040, examples: EXAMPLES_CURRENT, layout: LAYOUT_050,
 };
 
