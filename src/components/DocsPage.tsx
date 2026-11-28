@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import Logo from "../assets/blaze-cache-logo.png"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card"
@@ -282,6 +282,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
 
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeId, setActiveId] = useState("overview")
+  const sidebarRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     // The SPA ships one index.html for every route, so title, description, canonical and
@@ -315,20 +316,54 @@ pnpm bench:ci         # --quick run + 20% regression gate
     if (!window.location.hash) window.scrollTo({ top: 0 })
   }, [releaseId, isArchived])
 
+  // Sidebar highlight — the section whose heading has passed the sticky header wins.
+  // A narrow IntersectionObserver band can report several sections in one batch in an
+  // arbitrary order, so a jump (or two long sections overlapping the band) used to leave
+  // the highlight on the previous item. Reading the nav order on each frame is deterministic.
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) setActiveId(entry.target.id)
-        })
-      },
-      { rootMargin: "-20% 0px -60% 0px", threshold: 0 }
-    )
-    RELEASES[releaseId].nav.forEach((n) => {
-      const el = document.getElementById(n.id)
-      if (el) observer.observe(el)
-    })
-    return () => observer.disconnect()
+    let frame = 0
+    let lastHighlighted = ""
+    const update = () => {
+      frame = 0
+      const nav = RELEASES[releaseId].nav
+      // Sticky header (64px) plus the sections' scroll-mt-28 (112px).
+      const anchorLine = 140
+      let current = nav[0]?.id ?? "overview"
+      for (const item of nav) {
+        const el = document.getElementById(item.id)
+        if (el && el.getBoundingClientRect().top <= anchorLine) current = item.id
+      }
+      // The last section's heading may never reach the anchor line on a short page.
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
+        current = nav[nav.length - 1]?.id ?? current
+      }
+      if (current === lastHighlighted) return
+      lastHighlighted = current
+      setActiveId(current)
+      // The nav list is taller than a viewport: keep the highlighted item visible inside
+      // the sidebar's own scroll area so a jump never highlights an off-screen row.
+      const navEl = sidebarRef.current
+      const link = navEl?.querySelector<HTMLElement>(`[data-nav-id="${current}"]`)
+      if (navEl && link) {
+        const navRect = navEl.getBoundingClientRect()
+        const linkRect = link.getBoundingClientRect()
+        if (linkRect.top < navRect.top + 8) navEl.scrollTop -= navRect.top + 8 - linkRect.top
+        else if (linkRect.bottom > navRect.bottom - 8) navEl.scrollTop += linkRect.bottom - navRect.bottom + 8
+      }
+    }
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener("scroll", schedule, { passive: true })
+    window.addEventListener("resize", schedule)
+    window.addEventListener("hashchange", schedule)
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame)
+      window.removeEventListener("scroll", schedule)
+      window.removeEventListener("resize", schedule)
+      window.removeEventListener("hashchange", schedule)
+    }
   }, [releaseId])
 
   return (
@@ -400,7 +435,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
               sections, which can exceed a short viewport. The scrollbar itself is
               hidden (still wheel/trackpad/keyboard scrollable). */}
           <aside className="hidden lg:block">
-            <nav className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav ref={sidebarRef} className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="relative pl-4">
                 {/* Vertical line */}
                 <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-secondary rounded-full" />
@@ -410,11 +445,11 @@ pnpm bench:ci         # --quick run + 20% regression gate
                   const prev = navItems[idx - 1];
                   const prevGroup = prev ? navGroup(prev.id) : "";
                   return (
-                    <>
+                    <Fragment key={n.id}>
                       {group && group !== prevGroup && (
                         <div className="mt-3 mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-flame">{group}</div>
                       )}
-                    <a key={n.id} href={`#${n.id}`} className="relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors mb-1 group">
+                    <a data-nav-id={n.id} href={`#${n.id}`} className="relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors mb-1 group">
                       {/* Dot */}
                       <span className={`absolute -left-[11px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full border-2 shadow-md transition-all duration-300 z-10 ${active ? "bg-primary border-primary shadow-[#8a1e2e]/40 scale-125" : "bg-card border-stroke group-hover:border-primary"}`} />
                       {/* Label */}
@@ -422,7 +457,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
                         {n.label}
                       </span>
                     </a>
-                    </>
+                    </Fragment>
                   )
                 })}
               </div>
