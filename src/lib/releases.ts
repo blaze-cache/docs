@@ -1,7 +1,7 @@
 /**
  * One entry per published release of the library.
  */
-export type ReleaseId = "stable" | "previous" | "legacy";
+export type ReleaseId = "stable" | "previous" | "legacy" | "beta";
 export interface NavItem { id: string; label: string; }
 export interface MethodInfo { name: string; sig: string; desc: string; isNew?: boolean; }
 export interface CommandInfo { cmd: string; note: string; }
@@ -161,6 +161,29 @@ benchmarks/
 docs/                  benchmarks/RESULTS.md · plan/0.4.0-roadmap.md · security/
 .github/               rust.yml · js.yml (offline + live + bench:ci) · security.yml`;
 
+/** The 0.5.0-beta layout adds the devtools package and the query engine to the 0.4 tree. */
+const LAYOUT_050 = `crates/
+  blaze-cache-core/    Rust engine: slab, SIEVE queue, tags, TTL, stats, bytes arena, opt-in indexes
+  blaze-cache-wasm/    wasm-bindgen bindings (raw keys, tagged writes, query bindings)
+packages/
+  core/                @blaze-cache/core  (loader, persistence, multi-tab, query, shared subpath)
+  axios/               @blaze-cache/axios (HTTP adapter)
+  fetch/               @blaze-cache/fetch (drop-in fetch() replacement)
+  ky/                  @blaze-cache/ky (ky.extend hook, ky v1 + v2)
+  ofetch/              @blaze-cache/ofetch (ofetch / $fetch adapter)
+  react-query/         @blaze-cache/react-query (v5 mirror + hook)
+  swr/                 @blaze-cache/swr (SWR persist + hook)
+  devtools/            @blaze-cache/devtools (registry, snapshots, event feed)
+  integration-tests/   several packages sharing one cache
+examples/              one Vite playground per package
+benchmarks/
+  cache/               pnpm bench — Node matrix, 10 scenarios × 5 payload sizes
+  browser/             pnpm bench:browser — the same suite in headless Chrome
+  framework/           TanStack Query / SWR cache-store comparison
+  results/             published JSON + checked-in CI baseline
+docs/                  benchmarks/RESULTS.md · plan/0.5.0-roadmap.md · plan/0.6.0-roadmap.md · security/
+.github/               rust.yml · js.yml (offline + live + bench:ci) · security.yml`;
+
 /** Repo commands, with what each one runs — the current workspace's scripts. */
 const COMMANDS_CURRENT: CommandInfo[] = [
   { cmd: "pnpm install", note: "workspace dependencies" },
@@ -261,6 +284,52 @@ const CURRENT_RELEASE: Release = {
   commands: COMMANDS_040, examples: EXAMPLES_CURRENT, layout: LAYOUT_040,
 };
 
+// The 0.5.0 beta line: 0.4.0 plus the devtools registry, the typed query API with opt-in
+// indexes, and the wasm-free shared contract subpath. Served on /beta under npm's `beta`
+// dist-tag, so every install command below carries @beta. It renders the whole 0.4 page —
+// nothing the stable route documents was removed — and only adds the query methods to the
+// API table.
+const BETA_RELEASE: Release = {
+  id: "beta", version: "0.5.0-beta", badge: "v0.5.0-beta", legacy: false, prerelease: true, isNew: false, installTag: "@beta",
+  metaDescription: "Blaze Cache 0.5.0-beta prerelease documentation: @blaze-cache/devtools for zero-cost observability, the typed query API (query, queryKeys, count) with opt-in indexes and cursor paging, the wasm-free @blaze-cache/core/shared subpath, and additive invalidate tags — powered by Rust and WebAssembly.",
+  tests: { total: 644, detail: "510 package/integration · 27 benchmark-suite checks · 67 Rust engine · 7 allocation · 4 doctests · 29 wasm" },
+  packages: [
+    { pkg: "@blaze-cache/core", note: "Cache engine (Wasm + TS bindings)", peers: "None" },
+    { pkg: "@blaze-cache/devtools", note: "Read-only observability: registry, snapshots, event feed", peers: "None" },
+    { pkg: "@blaze-cache/axios", note: "Axios HTTP adapter", peers: "axios >= 1.7.0" },
+    { pkg: "@blaze-cache/fetch", note: "Drop-in fetch() with HTTP caching", peers: "None" },
+    { pkg: "@blaze-cache/ky", note: "ky HTTP adapter (ky v1 & v2)", peers: "ky >= 1.14 || 2" },
+    { pkg: "@blaze-cache/ofetch", note: "ofetch / $fetch HTTP adapter (Nuxt & Nitro)", peers: "ofetch >= 1.0" },
+    { pkg: "@blaze-cache/react-query", note: "TanStack Query v5 integration", peers: "@tanstack/react-query >= 5.0.0" },
+    { pkg: "@blaze-cache/swr", note: "SWR persist + hook", peers: "swr >= 2" },
+  ],
+  quickStart: [
+    "# core is the only package you must install", "npm install @blaze-cache/core@beta", "",
+    "# optional: read-only observability for the cache",
+    "npm install @blaze-cache/devtools@beta", "",
+    "# then only the integrations you use",
+    "npm install @blaze-cache/axios@beta",
+    "npm install @blaze-cache/fetch@beta",
+    "npm install @blaze-cache/ky@beta",
+    "npm install @blaze-cache/ofetch@beta",
+    "npm install @blaze-cache/react-query@beta",
+    "npm install @blaze-cache/swr@beta", "",
+    "# peers — only for the adapters above", "npm install axios", "npm install ky", "npm install ofetch", "npm install @tanstack/react-query", "",
+    "# optional: SWR config", "npm install swr",
+  ],
+  whatsNew: [
+    { kind: "new", title: "New package: `@blaze-cache/devtools`", desc: "Zero-cost-by-default observability. `attach(cache, { label? })` returns a handle with `detach`, `list` and `dispose`; the registry listens on wildcard events through a weak reference and `dispose()` removes every listener, so the drop log switches back off. Snapshots are built on demand — never on the hot path — with `maxEntries` / `maxValueBytes` caps and explicit truncation markers, values are cloned-or-described through a safe summarizer (`BigInt`, cycles, nested secrets redacted), and a versioned `{ protocol: 1, tabId, cacheId, kind }` envelope carries snapshots, events and actions to any transport.", href: "#install", more: "Installation", commits: ["06023b0", "869f81a", "bf61eda", "7819be6", "985cff8"] },
+    { kind: "new", title: "Typed query API: `query()`, `queryKeys()`, `count()`", desc: "Paged lookups over prefix, tags, a TTL range or a key allow-list. `limit` is required, the opaque `cursor` resumes after the last key and survives that key's deletion, `includeValues` returns rows only alongside both `maxEntries` and `maxValueBytes` caps, `withTotal` adds a count pass, and `truncated` says when the caps cut a page short — so a consumer can never mistake a capped page for the end of the results. The wasm bindings expose the same query across the boundary.", href: "#core", more: "Core API", commits: ["967419c", "b96387d", "a5dac81"] },
+    { kind: "new", title: "Opt-in indexes, zero cost when off", desc: "`indexes: true` builds prefix, tag and TTL indexes and backfills them once. With indexes off the hot path pays nothing, and `query()` refuses to guess: without an indexed constraint it throws unless the filter explicitly opts into `fullScan: true`. Indexed pages seek to the first match and stop at the first extra one, and allocation tests pin both the off path (zero) and the on path (backfill + one page).", href: "#core", more: "Core API", commits: ["36bb58b", "dcb54bb"] },
+    { kind: "new", title: "`@blaze-cache/core/shared` — the wasm-free contract subpath", desc: "A server-safe subpath with no wasm import: the redaction patterns, the frozen duck-typed `BlazeRecord` guard and the `<binding>:<feature>` kind convention. Every transport and the devtools summarizer import the contract from one place, so the shape can never drift between them.", href: "#core", more: "Core API", commits: ["5f3e1dd", "157c225"] },
+    { kind: "new", title: "`invalidate` events now carry `tags`", desc: "The `invalidate` event and `CacheChange` gained a `tags` array alongside `keys`: listeners run after the entries are gone, so `tagsOf(key)` could not recover them after the fact. Additive — existing listeners keep working — and the only shape change in 0.5.0.", href: "#events", more: "Events", commits: ["967419c"] },
+    { kind: "testing", title: "644 automated checks, all green", desc: "510 offline package and integration tests (17 of them the new devtools suite), 27 benchmark-suite checks, 67 Rust engine tests, 7 allocation tests — both indexes on and off — 4 doctests and 29 wasm-binding tests. The live network suites remain opt-in, and the same-runner A/B bench gate passed on the release commit.", href: "#repo", more: "Repo & Development", commits: ["1a1e7e0", "db35877"] },
+  ],
+  nav: NAV_040,
+  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS, ...STORAGE_METHODS],
+  commands: COMMANDS_040, examples: EXAMPLES_CURRENT, layout: LAYOUT_050,
+};
+
 // The previous stable line, archived at /0.3.0 after 0.4.0 became current. Kept as it
 // shipped: untagged installs, the 0.3 What's New set and no 0.4-only sections.
 const PREVIOUS_RELEASE: Release = {
@@ -308,6 +377,7 @@ const PREVIOUS_RELEASE: Release = {
 
 
 export const RELEASES: Record<ReleaseId, Release> = {
+  beta: BETA_RELEASE,
   stable: CURRENT_RELEASE,
   previous: PREVIOUS_RELEASE,
   legacy: {

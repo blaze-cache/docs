@@ -13,7 +13,7 @@ Built with:
 
 ## Features
 
-- Three routes: `/` documents the current stable release (0.4.0, marked **new**), `/0.3.0` the previous stable line and `/0.2.5` the archived 0.2 line — the old `/beta` route was retired when 0.4.0 went stable. Package lists, install commands, nav and API tables all come from `src/lib/releases.ts`
+- Four routes: `/beta` documents the 0.5.0-beta prerelease (installed through npm's `beta` tag), `/` the current stable release (0.4.0, marked **new**), `/0.3.0` the previous stable line and `/0.2.5` the archived 0.2 line — `/beta` was retired when 0.4.0 went stable and restored for the 0.5 series. Package lists, install commands, nav and API tables all come from `src/lib/releases.ts`
 - Responsive documentation layout with sticky sidebar timeline navigation
 - Interactive scroll-tracking indicator (dots highlight active section)
 - Mobile drawer navigation
@@ -26,11 +26,15 @@ Built with:
 refresh `whatsNew` and `coreMethods`, and every label on the page follows — the header badge, the
 version switcher, the install cards and the What's New grid.
 
-`RELEASES.stable` is the current release served at `/`; its `isNew: true` flag adds the "new" chip
-to the header and switcher. `RELEASES.previous` (0.3.0) and `RELEASES.legacy` (0.2.5) are archived
-lines served at `/0.3.0` and `/0.2.5` behind an `archive` banner. In `DocsPage.tsx`, `has040`
-gates the sections 0.4 introduced — persistence, wasm loading, storage modes, multi-tab sync,
-benchmarks and ofetch — so older lines keep rendering exactly what they shipped.
+
+`RELEASES.beta` (0.5.0-beta) is served at `/beta` behind an amber prerelease banner, with every
+install command carrying `@beta`. `RELEASES.stable` is the current release served at `/`; its
+`isNew: true` flag adds the "new" chip to the header and switcher. `RELEASES.previous` (0.3.0) and
+`RELEASES.legacy` (0.2.5) are archived lines served at `/0.3.0` and `/0.2.5` behind an `archive`
+banner. In `DocsPage.tsx`, `has040` gates the sections 0.4 introduced — persistence, wasm loading,
+storage modes, multi-tab sync, benchmarks and ofetch — for stable *and* beta (the beta is 0.4 plus
+devtools/query work), so older lines keep rendering exactly what they shipped, while `newIn` keeps
+"New in …" labels naming the 0.4 line instead of the beta's own version string.
 
 ## Development
 

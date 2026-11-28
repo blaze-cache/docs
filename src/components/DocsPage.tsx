@@ -63,13 +63,19 @@ function navGroup(id: string): string {
 
 export default function DocsPage({ release: releaseId }: { release: ReleaseId }) {
   const release = RELEASES[releaseId]
-  // Both 0.4.0 and the archived 0.3.0 line render the modern adapter/API content.
+  // Every non-legacy line — stable, the beta and the archived 0.3.0 — renders the modern adapter/API content.
   const isCurrent = !release.legacy
-  // Only the current stable line carries what 0.4 added: persistence, wasm loading,
-  // storage modes, multi-tab sync, benchmarks and the ofetch adapter.
-  const has040 = release.id === "stable"
-  // Anything but the latest stable renders an archive banner.
-  const isArchived = releaseId !== "stable"
+  // The 0.5 beta is 0.4.0 plus the devtools/query work, so it carries everything the
+  // current stable line carries: persistence, wasm loading, storage modes, multi-tab
+  // sync, benchmarks and the ofetch adapter.
+  const has040 = release.id === "stable" || release.id === "beta"
+  // Only the archived lines render an archive banner — the prerelease gets its own.
+  const isArchived = releaseId !== "stable" && releaseId !== "beta"
+  const isBeta = release.prerelease
+  // The sections rendered here (persistence, wasm, storage, multi-tab, benchmarks,
+  // ofetch, subscriptions) were introduced by the 0.4 line — on the beta route
+  // `release.version` is 0.5.0-beta, so name the line that actually added them.
+  const newIn = isBeta ? "0.4.0" : release.version
   const navItems = release.nav
   const quickStart = release.quickStart.join("\n")
   // The core example doubles as the wasm-loading story: 0.4 points at one explicit
@@ -207,10 +213,13 @@ pnpm bench:ci         # --quick run + 20% regression gate
     // the social tags are rewritten here for whichever release the URL selected — the
     // crawlers that render JS see per-page metadata, the rest fall back to index.html.
     const r = RELEASES[releaseId]
-    const title = isArchived
-      ? `Blaze Cache ${r.version} (archive) — Docs`
-      : "Blaze Cache 0.4.0 — Full-Featured Client-Side Cache"
-    const routePath = releaseId === "stable" ? "/" : releaseId === "previous" ? "/0.3.0" : "/0.2.5"
+    const title = r.prerelease
+      ? `Blaze Cache ${r.version} (prerelease) — Docs`
+      : isArchived
+        ? `Blaze Cache ${r.version} (archive) — Docs`
+        : "Blaze Cache 0.4.0 — Full-Featured Client-Side Cache"
+    const routePath =
+      releaseId === "beta" ? "/beta" : releaseId === "stable" ? "/" : releaseId === "previous" ? "/0.3.0" : "/0.2.5"
     const canonical = `https://blaze-cache.github.io${import.meta.env.BASE_URL.replace(/\/+$/, "")}${routePath}`
     const setMeta = (selector: string, attr: "content" | "href", value: string) => {
       document.querySelector(selector)?.setAttribute(attr, value)
@@ -258,10 +267,11 @@ pnpm bench:ci         # --quick run + 20% regression gate
             <Badge>{release.badge}</Badge>
             {release.isNew && <Badge variant="outline" className="border-primary text-flame">new</Badge>}
           </div>
-          {/* Version switcher — stable tracks npm's `latest` tag; the two older lines
-              are archived routes. Labels come from the release record, so a version
-              bump happens in exactly one place. */}
+          {/* Version switcher — the beta tracks npm's `beta` tag, stable tracks `latest`,
+              and the two older lines are archived routes. Labels come from the release
+              record, so a version bump happens in exactly one place. */}
           <nav aria-label="Documentation version" className="hidden items-center gap-1 rounded-lg border border-border bg-card p-0.5 px-3 lg:flex">
+            <VersionLink to="/beta" active={releaseId === "beta"}>{RELEASES.beta.badge}</VersionLink>
             <VersionLink to="/" active={releaseId === "stable"} isNew>{RELEASES.stable.badge}</VersionLink>
             <VersionLink to="/0.3.0" active={releaseId === "previous"}>{RELEASES.previous.badge}</VersionLink>
             <VersionLink to="/0.2.5" active={releaseId === "legacy"}>{RELEASES.legacy.badge}</VersionLink>
@@ -296,6 +306,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
             <div className="mt-6 border-t border-border pt-5">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Docs version</p>
               <div className="flex flex-wrap gap-2 px-1">
+                <VersionLink to="/beta" active={releaseId === "beta"}>{RELEASES.beta.badge}</VersionLink>
                 <VersionLink to="/" active={releaseId === "stable"} isNew>{RELEASES.stable.badge}</VersionLink>
                 <VersionLink to="/0.3.0" active={releaseId === "previous"}>{RELEASES.previous.badge}</VersionLink>
                 <VersionLink to="/0.2.5" active={releaseId === "legacy"}>{RELEASES.legacy.badge}</VersionLink>
@@ -345,7 +356,13 @@ pnpm bench:ci         # --quick run + 20% regression gate
 
           <main className="min-w-0">
             {/* Which release these docs describe */}
-            {isArchived ? (
+            {isBeta ? (
+              <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-600/50 bg-card px-5 py-4 text-sm text-muted-foreground">
+                <Badge variant="outline" className="border-amber-600/60 text-amber-700 dark:text-amber-300">beta</Badge>
+                <span>These docs describe <strong>{release.badge}</strong>, a prerelease — install it with <code className="font-mono text-foreground">{release.installTag}</code>, or leave the tag off for the stable release.</span>
+                <Link to="/" className="font-medium text-flame underline underline-offset-4 hover:text-foreground">Stable docs are {RELEASES.stable.badge} →</Link>
+              </div>
+            ) : isArchived ? (
               <div className="mb-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
                 <Badge variant="outline">archive</Badge>
                 <span>These docs describe <strong>{release.badge}</strong>, an earlier release.</span>
@@ -619,7 +636,7 @@ offEvict();           // …or just this one handle (idempotent)`} />
                     <div className="mt-8 space-y-6">
                       <Card className="border-border bg-card overflow-hidden">
                         <CardHeader className="border-b border-border">
-                          <code className="font-mono text-sm text-flame">subscribe / subscribeMany / subscribeTag — new in {release.version}</code>
+                          <code className="font-mono text-sm text-flame">subscribe / subscribeMany / subscribeTag — new in {newIn}</code>
                         </CardHeader>
                         <CardContent className="pt-6 relative">
                           <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`// The value-oriented front end of events: hand over a key, get the current value back.
@@ -680,7 +697,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Database size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Persistence</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     Optional write-through storage, off by default: pass{" "}
@@ -826,7 +843,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Zap size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Wasm Loading</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     <code className="text-flame">createCache()</code> loads the{" "}
@@ -879,7 +896,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Database size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Storage &amp; Memory</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     By default values stay <strong className="text-foreground">by reference</strong> in
@@ -935,7 +952,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Radio size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Multi-Tab Sync</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     The old "no coordination between tabs" limitation is gone. Opt in and each
@@ -979,7 +996,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Zap size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Benchmarks</h3>
-                    <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                    <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     Ten scenarios — fill, hit, miss, mixed, the <code>full-featured</code> headline,
@@ -1364,7 +1381,7 @@ cache.invalidateTags('fetch');`} />
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
                     <h3 className="text-3xl font-bold font-mono tracking-tight">Ky Adapter</h3>
-                    {!has040 && <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>}
+                    {!has040 && <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>}
                   </div>
                   <p className="text-muted-foreground mb-6 max-w-3xl">
                     The <code className="text-flame">@blaze-cache/ky</code> package caches ky
@@ -1486,7 +1503,7 @@ const users = await api.get('users').json();`} />
                     <div className="flex items-center gap-3 mb-6">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Wind size={20} /></div>
                       <h3 className="text-3xl font-bold font-mono tracking-tight">Ofetch Adapter</h3>
-                      <Badge className="text-xs px-2 py-0.5">New in {release.version}</Badge>
+                      <Badge className="text-xs px-2 py-0.5">New in {newIn}</Badge>
                     </div>
                     <p className="text-muted-foreground mb-6 max-w-3xl">
                       The <code className="text-flame">@blaze-cache/ofetch</code> package brings the
@@ -1648,7 +1665,7 @@ const users = await api.get('users').json();`} />
               )}
               {has040 && (
                 <p className="text-muted-foreground mb-6 max-w-3xl">
-                  New in this release: a call-site <code>forceRefresh</code> skips the persisted
+                  New in {newIn}: a call-site <code>forceRefresh</code> skips the persisted
                   seed but keeps the write, so the next mount starts from it — pull-to-refresh
                   without going stale; <code>tags</code> accepts a resolver run at write time from
                   the key and data; a cache that throws costs a console warning instead of a
@@ -1725,7 +1742,7 @@ cache.on((event) => console.log(event.type));   // wildcard — every event` : `
                   <Card className="border-border bg-card">
                     <CardHeader>
                       <CardTitle>Value subscriptions</CardTitle>
-                      <CardDescription>New in {release.version} — the value-oriented front end of events.</CardDescription>
+                      <CardDescription>New in {newIn} — the value-oriented front end of events.</CardDescription>
                     </CardHeader>
                     <CardContent className="relative">
                       <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{`const stop = cache.subscribe('user:42', (user, change) => {
