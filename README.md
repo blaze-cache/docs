@@ -18,7 +18,7 @@ Built with:
 - Interactive scroll-tracking indicator (dots highlight active section)
 - Mobile drawer navigation
 - Copy-to-clipboard buttons on all code snippets
-- Sections: Overview, What's New, Installation, Core API, Events (plus subscriptions on 0.4), Persistence, Wasm Loading, Storage & Memory, Multi-Tab Sync, Benchmarks, Axios Adapter, Fetch Adapter, Ky Adapter, Ofetch Adapter, React Query, SWR, Usage, Architecture (animated SVG), Problems Solved, Philosophy, Repo & Development
+- Sections: Overview, What's New, Installation, Core API, Events (plus subscriptions on 0.4), Typed Query API (beta only), Persistence, Wasm Loading, Storage & Memory, Multi-Tab Sync, Benchmarks, Axios Adapter, Fetch Adapter, Ky Adapter, Ofetch Adapter, React Query, SWR, Usage, Architecture (animated SVG), Problems Solved, Philosophy, Repo & Development
 
 ## Updating a release
 
@@ -34,7 +34,9 @@ install command carrying `@beta`. `RELEASES.stable` is the current release serve
 banner. In `DocsPage.tsx`, `has040` gates the sections 0.4 introduced — persistence, wasm loading,
 storage modes, multi-tab sync, benchmarks and ofetch — for stable *and* beta (the beta is 0.4 plus
 devtools/query work), so older lines keep rendering exactly what they shipped, while `newIn` keeps
-"New in …" labels naming the 0.4 line instead of the beta's own version string.
+"New in …" labels naming the 0.4 line instead of the beta's own version string. The beta also
+gets a beta-only `Typed Query API` section (`#query`, listed in `NAV_BETA`) with a runnable
+`query()` / `queryKeys()` / `count()` example and the `QueryOptions` table.
 
 ## Development
 

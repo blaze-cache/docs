@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Badge } from "./ui/badge"
 import { Separator } from "./ui/separator"
 import { Button } from "./ui/button"
-import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind, PlayCircle, ExternalLink } from "lucide-react"
+import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind, PlayCircle, ExternalLink, Search } from "lucide-react"
 import ArchitectureDiagram from "./ArchitectureDiagram"
 import CopyButton from "./CopyButton"
 import ThemeToggle from "./ThemeToggle"
@@ -54,7 +54,7 @@ function VersionLink({ to, active, children, isNew }: { to: string; active: bool
 
 /** Sidebar group heading for a nav id — '' when the item belongs to no group. */
 function navGroup(id: string): string {
-  if (["core", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
+  if (["core", "query", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
   if (["rq", "swr", "axios", "fetch", "ky", "ofetch"].includes(id)) return "Adapters"
   if (id === "usage") return "Usage"
   if (["benchmarks", "examples", "repo"].includes(id)) return "Repo"
@@ -199,6 +199,35 @@ const cache = await createCache({
 cache.on('remote-set', ({ key }) => console.log('another tab wrote', key));
 // strategy: 'value'    structured-clone payloads (fallback: invalidate tombstone)
 // strategy: 'invalidate'  send tombstones only — the app refetches on focus`
+  const queryExample = `import { createCache } from '@blaze-cache/core';
+
+// Opt in once — with indexes off the hot path pays nothing.
+const cache = await createCache({ capacity: 1000, indexes: true });
+
+cache.set('user:1', { name: 'Ada' }, { ttlMs: 60_000, tags: ['user', 'api'] });
+cache.set('user:2', { name: 'Lin' }, { ttlMs: 120_000, tags: ['user'] });
+
+// Metadata-only by default — items are { key, ttlMs, tags }.
+const page = cache.query({
+  prefix: 'user:',
+  tags: { all: ['user'] },     // any / all / none
+  ttlRange: { min: 30_000 },   // remaining TTL, in ms
+  limit: 20,                   // required page size
+});
+// page.nextCursor → 'user:1' | null  (opaque last-key anchor)
+
+const more = cache.query({ prefix: 'user:', limit: 20, cursor: page.nextCursor! });
+cache.queryKeys({ prefix: 'user:', limit: 20 }); // keys only
+cache.count({ prefix: 'user:' });                // matches, no paging
+
+// Live by-reference values need BOTH caps; truncated says a page was cut short.
+const rows = cache.query({
+  prefix: 'user:', limit: 50, includeValues: true,
+  maxEntries: 10, maxValueBytes: 64 * 1024, withTotal: true,
+});
+
+// Without indexes, an explicit full scan is the only O(n) path:
+// cache.query({ fullScan: true, limit: 20, where: (s) => s.tags.includes('user') });`
   const benchmarkExample = `pnpm bench            # Node: 10 scenarios × 5 payload sizes × 2 kinds
 pnpm bench:browser    # the identical suite in headless Chrome
 pnpm bench:framework  # TanStack Query / SWR cache-store point operations
@@ -689,6 +718,64 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
 
                 <Separator className="my-16 bg-border" />
               </>
+
+            {/* Typed Query API — the 0.5 beta's own section, with its runnable example */}
+            {isBeta && (
+              <>
+                <section id="query" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Search size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Typed Query API</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.badge}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    Paged, typed lookups over the live cache. Opt in once with <code>indexes: true</code> —
+                    with indexes off the hot path pays nothing and <code>query()</code> throws instead of
+                    silently walking every entry. An explicit <code>fullScan: true</code> is the only O(n)
+                    path, and rejects every constraint it would have to ignore.
+                  </p>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">createCache(&#123; indexes: true &#125;) → query / queryKeys / count</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{queryExample}</code></pre><CopyButton text={queryExample} />
+                    </CardContent>
+                  </Card>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "prefix", sig: "string", desc: "Only keys starting with this string." },
+                      { name: "tags", sig: "{ any?, all?, none? }", desc: "Tag set logic: at least one, every one, or none of the listed tags." },
+                      { name: "ttlRange", sig: "{ min?, max? }", desc: "Remaining TTL in milliseconds, not the original write window." },
+                      { name: "keys", sig: "readonly string[]", desc: "Allow-list — only these keys are considered." },
+                      { name: "limit", sig: "number (required)", desc: "Positive integer page size; query() throws without it." },
+                      { name: "cursor", sig: "string", desc: "Opaque last-key anchor from a previous page, surviving deletion of that key." },
+                      { name: "includeValues", sig: "boolean = false", desc: "Return live by-reference values — legal only with both maxEntries and maxValueBytes." },
+                      { name: "maxEntries / maxValueBytes", sig: "number", desc: "Hard caps on rows and estimated value bytes; truncated reports a cut-short page." },
+                      { name: "withTotal", sig: "boolean = false", desc: "Adds a separate full count pass as total." },
+                      { name: "fullScan / where", sig: "boolean / (summary) => boolean", desc: "Explicit O(n) path with an optional post-filter; rejects prefix, tags, ttlRange and keys." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    The same filters work on <code>queryKeys()</code> (keys only) and{" "}
+                    <code>count()</code> (which takes every filter except <code>limit</code> and{" "}
+                    <code>cursor</code>). Cursors are last-key anchors in ascending key order — they
+                    survive deletion of the anchor key, and dropping the cursor restarts at page one.
+                    The wasm bindings expose the same query across the boundary.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+              </>
+            )}
 
             {/* Persistence, wasm loading, storage, multi-tab and benchmarks — the 0.4 line's own sections */}
             {has040 && (

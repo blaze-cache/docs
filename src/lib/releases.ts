@@ -58,6 +58,13 @@ const NAV_040: NavItem[] = [
   ...NAV_CURRENT.slice(7), // react-query … repo
 ];
 
+/** The 0.5 beta inserts its typed query section right after the core material. */
+const NAV_BETA: NavItem[] = [
+  ...NAV_040.slice(0, 4), // overview … core (events render beneath it)
+  { id: "query", label: "Typed Query API" },
+  ...NAV_040.slice(4), // persistence … repo
+];
+
 const CORE_METHODS: MethodInfo[] = [
   { name: "get", sig: "(key: string) => V | undefined", desc: "Value stored under key, or undefined when missing/expired. Counts as hit/miss." },
   { name: "set", sig: "(key: string, value: V, options?: SetOptions) => void", desc: "Stores or replaces key. Replacing refreshes TTL and replaces tags." },
@@ -107,6 +114,13 @@ const STORAGE_METHODS: MethodInfo[] = [
   { name: "getBytes", sig: "(key) => Uint8Array | undefined", desc: "Zero-copy view onto the arena region — valid only until the next allocation or a memory.grow detaches it.", isNew: true },
   { name: "getBytesCopy", sig: "(key) => Uint8Array | undefined", desc: "Owned snapshot of the bytes — safe to retain beyond the next allocation.", isNew: true },
   { name: "setBytesReserved", sig: "(key, ptr, len, options?) => void", desc: "Advanced producer path: adopt a region you already wrote through wasmLinearMemory(), with no JS→Wasm copy.", isNew: true },
+];
+
+/** The typed query API added in the 0.5 line — opt-in indexes, cursor paging. */
+const QUERY_METHODS: MethodInfo[] = [
+  { name: "query", sig: "(filter: QueryOptions) => QueryResult<V>", desc: "Paged lookup by prefix, tags, TTL range or a key allow-list. `limit` is required; the `cursor` resumes after the last key and survives that key's deletion. Needs `indexes: true`, or an explicit `fullScan: true` opt-in — it never guesses an O(n) walk.", isNew: true },
+  { name: "queryKeys", sig: "(filter: QueryOptions) => QueryKeysResult", desc: "The same filters as query(), returning only keys with a `nextCursor` — no values cross the boundary.", isNew: true },
+  { name: "count", sig: "(filter?) => number", desc: "How many entries match, without paging: accepts every query filter except `limit` and `cursor`.", isNew: true },
 ];
 
 /** The archived 0.2.5 line — the layout it actually shipped with (no ky yet). */
@@ -319,14 +333,14 @@ const BETA_RELEASE: Release = {
   ],
   whatsNew: [
     { kind: "new", title: "New package: `@blaze-cache/devtools`", desc: "Zero-cost-by-default observability. `attach(cache, { label? })` returns a handle with `detach`, `list` and `dispose`; the registry listens on wildcard events through a weak reference and `dispose()` removes every listener, so the drop log switches back off. Snapshots are built on demand — never on the hot path — with `maxEntries` / `maxValueBytes` caps and explicit truncation markers, values are cloned-or-described through a safe summarizer (`BigInt`, cycles, nested secrets redacted), and a versioned `{ protocol: 1, tabId, cacheId, kind }` envelope carries snapshots, events and actions to any transport.", href: "#install", more: "Installation", commits: ["06023b0", "869f81a", "bf61eda", "7819be6", "985cff8"] },
-    { kind: "new", title: "Typed query API: `query()`, `queryKeys()`, `count()`", desc: "Paged lookups over prefix, tags, a TTL range or a key allow-list. `limit` is required, the opaque `cursor` resumes after the last key and survives that key's deletion, `includeValues` returns rows only alongside both `maxEntries` and `maxValueBytes` caps, `withTotal` adds a count pass, and `truncated` says when the caps cut a page short — so a consumer can never mistake a capped page for the end of the results. The wasm bindings expose the same query across the boundary.", href: "#core", more: "Core API", commits: ["967419c", "b96387d", "a5dac81"] },
-    { kind: "new", title: "Opt-in indexes, zero cost when off", desc: "`indexes: true` builds prefix, tag and TTL indexes and backfills them once. With indexes off the hot path pays nothing, and `query()` refuses to guess: without an indexed constraint it throws unless the filter explicitly opts into `fullScan: true`. Indexed pages seek to the first match and stop at the first extra one, and allocation tests pin both the off path (zero) and the on path (backfill + one page).", href: "#core", more: "Core API", commits: ["36bb58b", "dcb54bb"] },
+    { kind: "new", title: "Typed query API: `query()`, `queryKeys()`, `count()`", desc: "Paged lookups over prefix, tags, a TTL range or a key allow-list. `limit` is required, the opaque `cursor` resumes after the last key and survives that key's deletion, `includeValues` returns rows only alongside both `maxEntries` and `maxValueBytes` caps, `withTotal` adds a count pass, and `truncated` says when the caps cut a page short — so a consumer can never mistake a capped page for the end of the results. The wasm bindings expose the same query across the boundary.", href: "#query", more: "Typed Query API", commits: ["967419c", "b96387d", "a5dac81"] },
+    { kind: "new", title: "Opt-in indexes, zero cost when off", desc: "`indexes: true` builds prefix, tag and TTL indexes and backfills them once. With indexes off the hot path pays nothing, and `query()` refuses to guess: without an indexed constraint it throws unless the filter explicitly opts into `fullScan: true`. Indexed pages seek to the first match and stop at the first extra one, and allocation tests pin both the off path (zero) and the on path (backfill + one page).", href: "#query", more: "Typed Query API", commits: ["36bb58b", "dcb54bb"] },
     { kind: "new", title: "`@blaze-cache/core/shared` — the wasm-free contract subpath", desc: "A server-safe subpath with no wasm import: the redaction patterns, the frozen duck-typed `BlazeRecord` guard and the `<binding>:<feature>` kind convention. Every transport and the devtools summarizer import the contract from one place, so the shape can never drift between them.", href: "#core", more: "Core API", commits: ["5f3e1dd", "157c225"] },
     { kind: "new", title: "`invalidate` events now carry `tags`", desc: "The `invalidate` event and `CacheChange` gained a `tags` array alongside `keys`: listeners run after the entries are gone, so `tagsOf(key)` could not recover them after the fact. Additive — existing listeners keep working — and the only shape change in 0.5.0.", href: "#events", more: "Events", commits: ["967419c"] },
     { kind: "testing", title: "644 automated checks, all green", desc: "510 offline package and integration tests (17 of them the new devtools suite), 27 benchmark-suite checks, 67 Rust engine tests, 7 allocation tests — both indexes on and off — 4 doctests and 29 wasm-binding tests. The live network suites remain opt-in, and the same-runner A/B bench gate passed on the release commit.", href: "#repo", more: "Repo & Development", commits: ["1a1e7e0", "db35877"] },
   ],
-  nav: NAV_040,
-  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS, ...STORAGE_METHODS],
+  nav: NAV_BETA,
+  coreMethods: [...CORE_METHODS, ...INTROSPECTION.map((m) => ({ ...m, isNew: false })), ...SUBSCRIPTIONS, ...STORAGE_METHODS, ...QUERY_METHODS],
   commands: COMMANDS_040, examples: EXAMPLES_CURRENT, layout: LAYOUT_050,
 };
 
