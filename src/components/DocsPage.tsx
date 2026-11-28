@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Badge } from "./ui/badge"
 import { Separator } from "./ui/separator"
 import { Button } from "./ui/button"
-import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind, PlayCircle, ExternalLink, Search } from "lucide-react"
+import { Flame, Zap, ShieldCheck, Database, BookOpen, Terminal, Component, Menu, X, Globe, Sparkles, Radio, Wind, PlayCircle, ExternalLink, Search, Bug } from "lucide-react"
 import ArchitectureDiagram from "./ArchitectureDiagram"
 import CopyButton from "./CopyButton"
 import ThemeToggle from "./ThemeToggle"
@@ -54,7 +54,7 @@ function VersionLink({ to, active, children, isNew }: { to: string; active: bool
 
 /** Sidebar group heading for a nav id — '' when the item belongs to no group. */
 function navGroup(id: string): string {
-  if (["core", "query", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
+  if (["core", "query", "devtools", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
   if (["rq", "swr", "axios", "fetch", "ky", "ofetch"].includes(id)) return "Adapters"
   if (id === "usage") return "Usage"
   if (["benchmarks", "examples", "repo"].includes(id)) return "Repo"
@@ -228,6 +228,31 @@ const rows = cache.query({
 
 // Without indexes, an explicit full scan is the only O(n) path:
 // cache.query({ fullScan: true, limit: 20, where: (s) => s.tags.includes('user') });`
+  const devtoolsExample = `import { createCache } from '@blaze-cache/core';
+import { attach, detach, onEvent, summarize } from '@blaze-cache/devtools';
+
+const cache = await createCache({ indexes: true });
+
+// Nothing is registered until attach() — no listeners, timers or snapshots.
+const handle = attach(cache, { label: 'HTTP responses' });
+
+// Snapshots are built on demand, never on the hot path, and always bounded.
+const snap = handle.snapshot({ maxEntries: 20, maxValueBytes: 32 * 1024 });
+console.log(snap.protocol);          // 1 — the versioned protocol
+console.log(snap.payload.entries);   // { key, ttlMs, tags, value: <summary> }[]
+console.log(snap.payload.truncated); // { entries, bytes }
+
+// One wildcard listener feeds a ring buffer (500 by default).
+const off = onEvent((e) => console.log(e.type, e.key, e.ts));
+cache.set('user:1', { token: 'abc123' }, { tags: ['user'] });
+console.log(handle.events());        // recent events, oldest first
+
+// Values never leak: summarize() is cycle-safe and redacts shared patterns.
+console.log(summarize({ authorization: 'Bearer abc' })); // → [redacted]
+
+// …later — hands the core's drop-log state back exactly
+off();
+handle.detach(); // or detach(cache) / dispose() for every handle`
   const benchmarkExample = `pnpm bench            # Node: 10 scenarios × 5 payload sizes × 2 kinds
 pnpm bench:browser    # the identical suite in headless Chrome
 pnpm bench:framework  # TanStack Query / SWR cache-store point operations
@@ -770,6 +795,65 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                     <code>cursor</code>). Cursors are last-key anchors in ascending key order — they
                     survive deletion of the anchor key, and dropping the cursor restarts at page one.
                     The wasm bindings expose the same query across the boundary.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+              </>
+            )}
+
+            {/* Devtools — the 0.5 beta's zero-cost observability section */}
+            {isBeta && (
+              <>
+                <section id="devtools" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><Bug size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Devtools</h3>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.badge}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    <code>@blaze-cache/devtools</code> observes a cache without instrumenting application
+                    code. Importing it costs nothing: only <code>attach()</code> subscribes, and{" "}
+                    <code>detach()</code> hands back the exact unsubscribe function so the core's opt-in
+                    drop log switches off again. Snapshots are versioned (<code>protocol: 1</code>), bounded,
+                    and built on demand — never on the hot path.
+                  </p>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">attach → snapshot / events / onEvent → detach</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{devtoolsExample}</code></pre><CopyButton text={devtoolsExample} />
+                    </CardContent>
+                  </Card>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "attach(cache, options?)", sig: "→ DevtoolsHandle", desc: "Registers one weak-reference handle with a wildcard listener. Idempotent only while options agree; re-attaching with different options throws." },
+                      { name: "handle.snapshot(options?)", sig: "→ versioned envelope", desc: "On-demand stats, size, capacity, keys, summarized entries, TTL/tags and persistence stats. maxEntries / maxValueBytes cap rows and bytes with explicit truncation markers." },
+                      { name: "handle.events() / onEvent(fn)", sig: "→ events / unsubscribe", desc: "A ring buffer (default 500) of the live feed plus subscriptions — no timers or polling; events arrive from the cache's own listener." },
+                      { name: "detach(handle | cache) / dispose()", sig: "→ number / void", desc: "Removes one handle or every attachment and restores the cache's prior drop-log state exactly." },
+                      { name: "list()", sig: "→ attachment[]", desc: "The live cacheId, clientId and label of every attached handle." },
+                      { name: "summarize(value, options?)", sig: "→ ValueSummary", desc: "Bounded, cycle-safe clone-or-describe walk. BigInt, Maps, hostile getters and deep nesting degrade to markers, never throw." },
+                      { name: "createEnvelope / isDevtoolsEnvelope", sig: "protocol: 1", desc: "The versioned { protocol, tabId, clientId, cacheId, ts, kind, payload } envelope shared by every transport." },
+                      { name: "label", sig: "string", desc: "A human label for the handle, carried through list() and snapshots." },
+                      { name: "redactKeys", sig: "readonly RegExp[]", desc: "Overrides the frozen @blaze-cache/core/shared patterns. Matching keys render as [redacted] at every level; a broken pattern fails closed." },
+                      { name: "valueMode", sig: "'summary' | 'full'", desc: "'summary' (default) summarizes values; 'full' is an explicit opt-in that still returns clones, never live references." },
+                      { name: "maxEvents", sig: "number = 500", desc: "Ring-buffer size for this handle's event feed." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Snapshots use the indexed <code>query()</code> API with caps when indexes are enabled,
+                    and fall back to a bounded full scan otherwise — so a cache created without indexes is
+                    still inspectable. The versioned envelope and the frozen redaction contract come from{" "}
+                    <code>@blaze-cache/core/shared</code>, which is wasm-free and safe to import on a server.
                   </p>
                 </section>
 
