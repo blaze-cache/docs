@@ -18,14 +18,13 @@ Built with:
 - Interactive scroll-tracking indicator (dots highlight active section)
 - Mobile drawer navigation
 - Copy-to-clipboard buttons on all code snippets
-- Sections: Overview, What's New, Installation, Core API, Events (plus subscriptions on 0.4), Typed Query API (beta only), Devtools (beta only), Persistence, Wasm Loading, Storage & Memory, Multi-Tab Sync, Benchmarks, Axios Adapter, Fetch Adapter, Ky Adapter, Ofetch Adapter, React Query, SWR, Usage, Architecture (animated SVG), Problems Solved, Philosophy, Repo & Development
+- Sections: Overview, What's New, Installation, Core API, Events (plus subscriptions on 0.4), Typed Query API (beta only), Devtools (beta only), Shared Contract (beta only), Persistence, Wasm Loading, Storage & Memory, Multi-Tab Sync, Benchmarks, Axios Adapter, Fetch Adapter, Ky Adapter, Ofetch Adapter, React Query, SWR, Usage, Architecture (animated SVG), Problems Solved, Philosophy, Repo & Development
 
 ## Updating a release
 
 `src/lib/releases.ts` is the single source of truth: bump `version`, `badge` and `installTag`,
 refresh `whatsNew` and `coreMethods`, and every label on the page follows — the header badge, the
 version switcher, the install cards and the What's New grid.
-
 
 `RELEASES.beta` (0.5.0-beta) is served at `/beta` behind an amber prerelease banner, with every
 install command carrying `@beta`. `RELEASES.stable` is the current release served at `/`; its
@@ -35,10 +34,11 @@ banner. In `DocsPage.tsx`, `has040` gates the sections 0.4 introduced — persis
 storage modes, multi-tab sync, benchmarks and ofetch — for stable *and* beta (the beta is 0.4 plus
 devtools/query work), so older lines keep rendering exactly what they shipped, while `newIn` keeps
 "New in …" labels naming the 0.4 line instead of the beta's own version string. The beta also
-gets a beta-only `Typed Query API` section (`#query`, listed in `NAV_BETA`) with a runnable
+gets three beta-only sections (listed in `NAV_BETA`): `Typed Query API` (`#query`) with a runnable
 `query()` / `queryKeys()` / `count()` example and the `QueryOptions` table, and `Devtools`
 (`#devtools`) with an `attach` → `snapshot` / `events` → `detach` example and the full API/options
-reference.
+reference, and `Shared Contract` (`#shared`) with a server-safe `@blaze-cache/core/shared` example
+and the redaction/record/kind helpers.
 
 ## Development
 

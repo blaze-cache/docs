@@ -54,7 +54,7 @@ function VersionLink({ to, active, children, isNew }: { to: string; active: bool
 
 /** Sidebar group heading for a nav id — '' when the item belongs to no group. */
 function navGroup(id: string): string {
-  if (["core", "query", "devtools", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
+  if (["core", "query", "devtools", "shared", "persistence", "wasm", "storage", "multitab"].includes(id)) return "Core"
   if (["rq", "swr", "axios", "fetch", "ky", "ofetch"].includes(id)) return "Adapters"
   if (id === "usage") return "Usage"
   if (["benchmarks", "examples", "repo"].includes(id)) return "Repo"
@@ -253,6 +253,27 @@ console.log(summarize({ authorization: 'Bearer abc' })); // → [redacted]
 // …later — hands the core's drop-log state back exactly
 off();
 handle.detach(); // or detach(cache) / dispose() for every handle`
+  const sharedExample = `// No wasm, no IndexedDB, no DOM — safe in Node, SSR and serializers.
+import {
+  REDACT_KEY_PATTERNS, isRedactedKey, redactKey,
+  isBlazeRecord, makeBlazeKind, bindingFromKind, featureFromKind,
+} from '@blaze-cache/core/shared';
+
+// Deny-by-default redaction, shared by every transport and the event feed.
+isRedactedKey('Authorization');   // true
+redactKey('session:abc');         // '[redacted]'
+redactKey('user:42');             // 'user:42'
+REDACT_KEY_PATTERNS.length;       // 9 frozen patterns
+
+// Frozen, version-tolerant guard — future envelope versions still pass.
+const record = { kind: 'next:route', v: 2, data: { id: 1 }, storedAt: Date.now() };
+isBlazeRecord(record);            // true — data is never inspected
+isBlazeRecord({ kind: 'x', v: 1 }); // false
+
+// One naming convention for every binding's records.
+const kind = makeBlazeKind('next', 'route'); // 'next:route'
+bindingFromKind(kind);  // 'next'
+featureFromKind(kind);  // 'route'`
   const benchmarkExample = `pnpm bench            # Node: 10 scenarios × 5 payload sizes × 2 kinds
 pnpm bench:browser    # the identical suite in headless Chrome
 pnpm bench:framework  # TanStack Query / SWR cache-store point operations
@@ -854,6 +875,60 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                     and fall back to a bounded full scan otherwise — so a cache created without indexes is
                     still inspectable. The versioned envelope and the frozen redaction contract come from{" "}
                     <code>@blaze-cache/core/shared</code>, which is wasm-free and safe to import on a server.
+                  </p>
+                </section>
+
+                <Separator className="my-16 bg-border" />
+              </>
+            )}
+
+            {/* The frozen shared contract — the 0.5 beta's server-safe subpath */}
+            {isBeta && (
+              <>
+                <section id="shared" className="mb-20 scroll-mt-28">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-flame shadow-lg shadow-[#8a1e2e]/10"><ShieldCheck size={20} /></div>
+                    <h3 className="text-3xl font-bold font-mono tracking-tight">Shared Contract</h3>
+                    <code className="font-mono text-sm text-muted-foreground">@blaze-cache/core/shared</code>
+                    <Badge className="text-xs px-2 py-0.5">New in {release.badge}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-6 max-w-3xl">
+                    A wasm-free, server-safe subpath that imports nothing from the cache runtime, IndexedDB
+                    or the DOM. Bindings, snapshot bridges and devtools all import the same frozen shapes —
+                    so what counts as a secret, and how a binding record is named, can never drift apart.
+                  </p>
+                  <Card className="border-border bg-card overflow-hidden">
+                    <CardHeader className="border-b border-border">
+                      <code className="font-mono text-sm text-flame">REDACT_KEY_PATTERNS · isBlazeRecord · &lt;binding&gt;:&lt;feature&gt;</code>
+                    </CardHeader>
+                    <CardContent className="pt-6 relative">
+                      <pre className="overflow-x-auto rounded-lg bg-code p-4 text-sm font-mono leading-7 border border-border text-foreground"><code>{sharedExample}</code></pre><CopyButton text={sharedExample} />
+                    </CardContent>
+                  </Card>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: "REDACT_KEY_PATTERNS", sig: "readonly RegExp[] (frozen)", desc: "Nine deny-by-default patterns: authorization, token, cookie, credential, password, passwd, secret, api[-_]?key and session — matched case-insensitively against the whole key." },
+                      { name: "isRedactedKey(key, patterns?)", sig: "boolean", desc: "True when the key matches any pattern. A pattern that throws, or is a stateful frozen global, fails closed — redaction never silently switches off." },
+                      { name: "redactKey(key, patterns?, replacement?)", sig: "string", desc: "Returns the opaque [redacted] marker for sensitive keys, the key itself otherwise." },
+                      { name: "BlazeRecord<V>", sig: "{ kind, v, data, storedAt }", desc: "The envelope written by framework bindings; storedAt breaks restore ties, v is guard-tested as any finite number." },
+                      { name: "isBlazeRecord(value)", sig: "value is BlazeRecord", desc: "Frozen duck-typed guard, tolerant of older and newer envelope versions. Never inspects data, so a future record is still shown as a record — never expanded in the UI." },
+                      { name: "makeBlazeKind(binding, feature)", sig: "string", desc: "Builds a namespaced kind such as next:route from the one shared separator." },
+                      { name: "bindingFromKind / featureFromKind", sig: "string | undefined", desc: "Parse either half of a kind; undefined when it does not follow the convention (empty side or no separator)." },
+                      { name: "KIND_SEPARATOR", sig: "':'", desc: "The single separator the convention is built on, exported so every binding agrees on it." },
+                    ].map((o) => (
+                      <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
+                        <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
+                        <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 max-w-3xl text-muted-foreground">
+                    Nothing here loads wasm or touches a browser API, so a Node server, an SSR bundle or a
+                    snapshot serialiser can import it safely. Devtools re-exports the same helpers — a summary
+                    and a binding write therefore agree on what is secret and how records are named.
                   </p>
                 </section>
 
