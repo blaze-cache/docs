@@ -399,7 +399,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-60 lg:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 h-full w-72 bg-card border-r border-border shadow-2xl shadow-black/40 p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-8">
@@ -435,10 +435,10 @@ pnpm bench:ci         # --quick run + 20% regression gate
               sections, which can exceed a short viewport. The scrollbar itself is
               hidden (still wheel/trackpad/keyboard scrollable). */}
           <aside className="hidden lg:block">
-            <nav ref={sidebarRef} className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav ref={sidebarRef} className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pr-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
               <div className="relative pl-4">
                 {/* Vertical line */}
-                <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-secondary rounded-full" />
+                <div className="absolute left-2.75 top-2 bottom-2 w-0.5 bg-secondary rounded-full" />
                 {navItems.map((n, idx) => {
                   const active = activeId === n.id;
                   const group = navGroup(n.id);
@@ -451,7 +451,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
                       )}
                     <a data-nav-id={n.id} href={`#${n.id}`} className="relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors mb-1 group">
                       {/* Dot */}
-                      <span className={`absolute -left-[11px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full border-2 shadow-md transition-all duration-300 z-10 ${active ? "bg-primary border-primary shadow-[#8a1e2e]/40 scale-125" : "bg-card border-stroke group-hover:border-primary"}`} />
+                      <span className={`absolute -left-2.75 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full border-2 shadow-md transition-all duration-300 z-10 ${active ? "bg-primary border-primary shadow-[#8a1e2e]/40 scale-125" : "bg-card border-stroke group-hover:border-primary"}`} />
                       {/* Label */}
                       <span className={`truncate transition-colors ${active ? "text-foreground font-semibold" : "text-muted-foreground group-hover:text-primary-foreground"}`}>
                         {n.label}
@@ -489,12 +489,12 @@ pnpm bench:ci         # --quick run + 20% regression gate
 
             {/* Hero */}
             <section id="overview" className="mb-20">
-              <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-card via-background to-card shadow-2xl shadow-[#8a1e2e]/10 px-8 py-14 md:px-14 md:py-16">
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-linear-to-br from-card via-background to-card shadow-2xl shadow-[#8a1e2e]/10 px-8 py-14 md:px-14 md:py-16">
                 <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
                 <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-[#6b1020]/20 blur-3xl" />
                 <div className="relative">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-flame mb-4">Blaze Cache</p>
-                  <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] bg-gradient-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6 max-w-4xl">A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly.</h2>
+                  <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] bg-linear-to-br from-foreground via-foreground to-primary bg-clip-text text-transparent mb-6 max-w-4xl">A full-featured client-side cache for the browser: TTL, tags, SIEVE eviction, and IndexedDB persistence, powered by Rust and WebAssembly.</h2>
                   <div className="mt-8 flex flex-wrap gap-3">
                     <Badge className="text-sm px-3 py-1">Wasm hot path</Badge>
                     <Badge className="text-sm px-3 py-1">O(1) eviction</Badge>
@@ -595,7 +595,7 @@ pnpm bench:ci         # --quick run + 20% regression gate
                 {release.packages.map((i) => (
                   <Card key={i.pkg} className="border-border bg-card">
                     <CardHeader>
-                      <CardTitle className="font-mono text-base break-words">{i.pkg}</CardTitle>
+                      <CardTitle className="font-mono text-base wrap-break-word">{i.pkg}</CardTitle>
                       <CardDescription className="text-xs">{i.note}</CardDescription>
                       <div className="mt-2 break-all rounded-md bg-code p-3 font-mono text-xs text-foreground border border-border">npm install {i.pkg}{release.installTag}</div>
                     </CardHeader>
@@ -1012,7 +1012,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                     ].map((o) => (
                       <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                         <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                         <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                       </div>
                     ))}
@@ -1153,7 +1153,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                     ].map((o) => (
                       <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                         <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                         <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                       </div>
                     ))}
@@ -1212,7 +1212,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                     ].map((o) => (
                       <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                         <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                         <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                       </div>
                     ))}
@@ -1260,7 +1260,7 @@ stop(); stopMany(); stopTag();         // idempotent — also safe from inside a
                     ].map((o) => (
                       <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                         <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                         <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                       </div>
                     ))}
@@ -1520,7 +1520,7 @@ const api = axios.create({
                 ].map((o) => (
                   <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                     <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                    <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                    <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                     <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                   </div>
                 ))}
@@ -1636,7 +1636,7 @@ cache.invalidateTags('fetch');`} />
                     ].map((o) => (
                       <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                         <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                         <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                       </div>
                     ))}
@@ -1760,7 +1760,7 @@ const users = await api.get('users').json();`} />
                     ].map((o) => (
                       <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                         <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                         <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                       </div>
                     ))}
@@ -1837,7 +1837,7 @@ const users = await api.get('users').json();`} />
                       ].map((o) => (
                         <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                           <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                          <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                          <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                           <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                         </div>
                       ))}
@@ -1978,7 +1978,7 @@ const users = await api.get('users').json();`} />
                 ].map((o) => (
                   <div key={o.name} className="text-left rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary transition-colors group">
                     <div className="font-mono text-sm font-semibold text-foreground group-hover:text-foreground">{o.name}</div>
-                    <div className="mt-0.5 font-mono text-xs text-muted-foreground break-words">{o.sig}</div>
+                    <div className="mt-0.5 font-mono text-xs text-muted-foreground wrap-break-word">{o.sig}</div>
                     <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{o.desc}</div>
                   </div>
                 ))}
